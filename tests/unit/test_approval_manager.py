@@ -1,12 +1,10 @@
-"""Tests for ApprovalManager — methods raise NotImplementedError.
+"""Tests for ApprovalManager -- resolve() calls exec.approval.resolve RPC.
 
-approvals.list and approvals.resolve do NOT exist on the OpenClaw gateway
-(verified 2026-02-21).  Approvals are push-event based.
+Pending approvals are push-event based (approval.requested), but resolution
+uses the ``exec.approval.resolve`` RPC method (verified 2026-02-21).
 """
 
 from __future__ import annotations
-
-import pytest
 
 from openclaw_sdk.approvals.manager import ApprovalManager
 from openclaw_sdk.gateway.mock import MockGateway
@@ -18,22 +16,41 @@ def _make_manager() -> tuple[MockGateway, ApprovalManager]:
     return mock, ApprovalManager(mock)
 
 
-async def test_list_requests_raises_not_implemented() -> None:
-    _, mgr = _make_manager()
+async def test_resolve_approve_calls_gateway() -> None:
+    mock, mgr = _make_manager()
+    mock.register("exec.approval.resolve", {"ok": True})
 
-    with pytest.raises(NotImplementedError, match="approvals.list does not exist"):
-        await mgr.list_requests()
+    result = await mgr.resolve("req_123", "approve")
+
+    assert result == {"ok": True}
+    mock.assert_called("exec.approval.resolve")
+    mock.assert_called_with(
+        "exec.approval.resolve",
+        {"id": "req_123", "decision": "approve"},
+    )
 
 
-async def test_resolve_raises_not_implemented() -> None:
-    _, mgr = _make_manager()
+async def test_resolve_deny_calls_gateway() -> None:
+    mock, mgr = _make_manager()
+    mock.register("exec.approval.resolve", {"ok": True})
 
-    with pytest.raises(NotImplementedError, match="approvals.resolve does not exist"):
-        await mgr.resolve("req-1", "approve")
+    result = await mgr.resolve("req_456", "deny")
+
+    assert result == {"ok": True}
+    mock.assert_called_with(
+        "exec.approval.resolve",
+        {"id": "req_456", "decision": "deny"},
+    )
 
 
-async def test_resolve_with_note_raises_not_implemented() -> None:
-    _, mgr = _make_manager()
+async def test_resolve_returns_gateway_response() -> None:
+    mock, mgr = _make_manager()
+    mock.register(
+        "exec.approval.resolve",
+        {"resolved": True, "requestId": "req_789"},
+    )
 
-    with pytest.raises(NotImplementedError):
-        await mgr.resolve("req-2", "deny", note="Too dangerous")
+    result = await mgr.resolve("req_789", "approve")
+
+    assert result["resolved"] is True
+    assert result["requestId"] == "req_789"

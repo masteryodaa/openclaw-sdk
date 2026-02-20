@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from openclaw_sdk.gateway.mock import MockGateway
 
 
@@ -226,22 +224,34 @@ async def test_config_apply_with_hash() -> None:
 
 
 # ------------------------------------------------------------------ #
-# Approvals facade — raises NotImplementedError
+# Approvals facade — exec.approval.resolve RPC
 # ------------------------------------------------------------------ #
 
 
-async def test_list_approval_requests_raises() -> None:
+async def test_resolve_approval_approve() -> None:
     gw = _make_gateway()
+    gw.register("exec.approval.resolve", {"ok": True})
 
-    with pytest.raises(NotImplementedError, match="approvals.list does not exist"):
-        await gw.list_approval_requests()
+    result = await gw.resolve_approval("r1", "approve")
+
+    assert result == {"ok": True}
+    gw.assert_called_with(
+        "exec.approval.resolve",
+        {"id": "r1", "decision": "approve"},
+    )
 
 
-async def test_resolve_approval_raises() -> None:
+async def test_resolve_approval_deny() -> None:
     gw = _make_gateway()
+    gw.register("exec.approval.resolve", {"ok": True})
 
-    with pytest.raises(NotImplementedError, match="approvals.resolve does not exist"):
-        await gw.resolve_approval("r1", "approve")
+    result = await gw.resolve_approval("r1", "deny")
+
+    assert result == {"ok": True}
+    gw.assert_called_with(
+        "exec.approval.resolve",
+        {"id": "r1", "decision": "deny"},
+    )
 
 
 # ------------------------------------------------------------------ #

@@ -219,37 +219,31 @@ class Gateway(ABC):
     # Approvals facade
     # ------------------------------------------------------------------ #
     #
-    # NOTE: ``approvals.list`` and ``approvals.resolve`` do NOT exist as
-    # gateway RPC methods (verified 2026-02-21).  Approvals in OpenClaw
-    # are delivered as push events (``approval.requested``).  The methods
-    # below raise ``NotImplementedError`` so callers get a clear message.
+    # NOTE: ``approvals.list`` does NOT exist as a gateway RPC method
+    # (verified 2026-02-21).  Pending approvals are delivered as push
+    # events (``approval.requested``) via ``subscribe()``.
     #
-
-    async def list_approval_requests(self) -> list[dict[str, Any]]:
-        """List pending execution approval requests.
-
-        Raises:
-            NotImplementedError: Approvals are push-event based, not RPC.
-        """
-        raise NotImplementedError(
-            "approvals.list does not exist on the OpenClaw gateway. "
-            "Approvals are delivered as push events via subscribe()."
-        )
+    # However, ``exec.approval.resolve`` DOES exist as an RPC method
+    # (verified 2026-02-21).  Use it to approve or deny a pending
+    # execution request after receiving the push event.
+    #
 
     async def resolve_approval(
         self,
         request_id: str,
         decision: str,
-        note: str | None = None,
     ) -> dict[str, Any]:
-        """Approve or deny a pending request.
+        """Approve or deny a pending execution request.
 
-        Raises:
-            NotImplementedError: Approvals are push-event based, not RPC.
+        Gateway method: ``exec.approval.resolve``
+        Verified params: ``{id, decision}``
+
+        Workflow: subscribe for ``approval.requested`` events to learn about
+        pending approvals, then call this method to resolve them.
         """
-        raise NotImplementedError(
-            "approvals.resolve does not exist on the OpenClaw gateway. "
-            "Approval resolution may be handled via push events."
+        return await self.call(
+            "exec.approval.resolve",
+            {"id": request_id, "decision": decision},
         )
 
     # ------------------------------------------------------------------ #
