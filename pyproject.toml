@@ -1,0 +1,58 @@
+[tool.poetry]
+name = "openclaw-sdk"
+version = "0.1.0"
+description = "Python SDK for the OpenClaw autonomous AI agent framework"
+authors = []
+license = "MIT"
+readme = "README.md"
+packages = [{ include = "openclaw_sdk", from = "src" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pydantic = ">=2.0"
+websockets = ">=12.0"
+httpx = ">=0.25"
+structlog = ">=23.0"
+
+[tool.poetry.extras]
+fastapi = ["fastapi", "uvicorn"]
+
+[tool.poetry.dependencies.fastapi]
+version = ">=0.100"
+optional = true
+
+[tool.poetry.dependencies.uvicorn]
+version = ">=0.23"
+optional = true
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=7.0"
+pytest-asyncio = ">=0.21"
+pytest-cov = ">=4.0"
+mypy = ">=1.0"
+ruff = ">=0.1"
+black = ">=23.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.mypy]
+strict = true
+python_version = "3.11"
+
+[[tool.mypy.overrides]]
+module = "openclaw_sdk.integrations.fastapi"
+ignore_missing_imports = true
+disallow_untyped_decorators = false
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "integration: marks tests as integration tests requiring a live OpenClaw gateway (deselect with '-m \"not integration\"')",
+]

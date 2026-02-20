@@ -1,0 +1,26 @@
+doc.md
+plan.md
+.claude
+
+# Virtual environment
+env/
+.venv/
+
+# Poetry
+poetry.lock
+
+# Python build artefacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Test / coverage artefacts
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
