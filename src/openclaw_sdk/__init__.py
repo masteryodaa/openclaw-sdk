@@ -70,6 +70,7 @@ from openclaw_sdk.tools.config import (
 )
 from openclaw_sdk.approvals.manager import ApprovalManager
 from openclaw_sdk.config.manager import ConfigManager
+from openclaw_sdk.devices.manager import DeviceManager
 from openclaw_sdk.nodes.manager import NodeManager
 from openclaw_sdk.ops.manager import OpsManager
 from openclaw_sdk.webhooks.manager import WebhookConfig, WebhookManager
@@ -134,6 +135,7 @@ __all__ = [
     "ScheduleConfig",
     "CronJob",
     "ConfigManager",
+    "DeviceManager",
     "ApprovalManager",
     "NodeManager",
     "OpsManager",

@@ -13,6 +13,7 @@ from openclaw_sdk.core.constants import AgentStatus
 from openclaw_sdk.core.exceptions import ConfigurationError
 from openclaw_sdk.core.types import AgentSummary, HealthStatus
 from openclaw_sdk.gateway.base import Gateway
+from openclaw_sdk.devices.manager import DeviceManager
 from openclaw_sdk.nodes.manager import NodeManager
 from openclaw_sdk.ops.manager import OpsManager
 from openclaw_sdk.scheduling.manager import ScheduleManager
@@ -73,6 +74,7 @@ class OpenClawClient:
         self._approvals: ApprovalManager | None = None
         self._nodes: NodeManager | None = None
         self._ops: OpsManager | None = None
+        self._devices: DeviceManager | None = None
 
     # ------------------------------------------------------------------ #
     # Factory
@@ -216,6 +218,13 @@ class OpenClawClient:
         if self._ops is None:
             self._ops = OpsManager(self._gateway)
         return self._ops
+
+    @property
+    def devices(self) -> DeviceManager:
+        """Manager for device token operations (rotate, revoke)."""
+        if self._devices is None:
+            self._devices = DeviceManager(self._gateway)
+        return self._devices
 
     # ------------------------------------------------------------------ #
     # Agent & pipeline helpers

@@ -334,6 +334,34 @@ class Gateway(ABC):
         }
 
     # ------------------------------------------------------------------ #
+    # Device management facade
+    # ------------------------------------------------------------------ #
+
+    async def device_token_rotate(
+        self, device_id: str, role: str
+    ) -> dict[str, Any]:
+        """Rotate a device's auth token.
+
+        Gateway method: ``device.token.rotate``
+        Verified params: ``{deviceId, role}``
+        """
+        return await self.call(
+            "device.token.rotate", {"deviceId": device_id, "role": role}
+        )
+
+    async def device_token_revoke(
+        self, device_id: str, role: str
+    ) -> dict[str, Any]:
+        """Revoke a device's auth token.
+
+        Gateway method: ``device.token.revoke``
+        Verified params: ``{deviceId, role}``
+        """
+        return await self.call(
+            "device.token.revoke", {"deviceId": device_id, "role": role}
+        )
+
+    # ------------------------------------------------------------------ #
     # Context manager support
     # ------------------------------------------------------------------ #
 
