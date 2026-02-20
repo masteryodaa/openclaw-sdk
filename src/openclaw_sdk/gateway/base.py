@@ -97,6 +97,18 @@ class Gateway(ABC):
         )
 
     # ------------------------------------------------------------------ #
+    # Agent run facade
+    # ------------------------------------------------------------------ #
+
+    async def agent_wait(self, run_id: str) -> dict[str, Any]:
+        """Wait for an agent run to complete.
+
+        Gateway method: ``agent.wait``
+        Verified param: ``{runId}``
+        """
+        return await self.call("agent.wait", {"runId": run_id})
+
+    # ------------------------------------------------------------------ #
     # Sessions admin facade
     # ------------------------------------------------------------------ #
 

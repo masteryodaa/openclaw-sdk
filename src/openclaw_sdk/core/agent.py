@@ -264,6 +264,19 @@ class Agent:
         except ValueError:
             return AgentStatus.IDLE
 
+    async def wait_for_run(self, run_id: str) -> dict[str, Any]:
+        """Wait for a specific run to complete.
+
+        Gateway method: ``agent.wait``
+
+        Args:
+            run_id: The run ID from a ``chat.send`` response.
+
+        Returns:
+            Gateway response dict with run result.
+        """
+        return await self._client.gateway.call("agent.wait", {"runId": run_id})
+
     # ------------------------------------------------------------------ #
     # Internal helpers
     # ------------------------------------------------------------------ #
