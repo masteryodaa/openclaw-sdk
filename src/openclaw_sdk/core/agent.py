@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import json
 import time
+import warnings
 from typing import TYPE_CHECKING, Any, AsyncIterator, Type, TypeVar
 
 from pydantic import BaseModel
@@ -17,6 +19,8 @@ from openclaw_sdk.tools.config import ToolConfig
 
 if TYPE_CHECKING:
     from openclaw_sdk.core.client import OpenClawClient
+    from openclaw_sdk.mcp.server import HttpMcpServer, StdioMcpServer
+    from openclaw_sdk.tools.policy import ToolPolicy
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -183,7 +187,7 @@ class Agent:
         Returns:
             List of ExecutionResult in the same order as queries.
         """
-        sem = asyncio.Semaphore(max_concurrency or len(queries))
+        sem = asyncio.Semaphore(max_concurrency if max_concurrency is not None else len(queries))
 
         async def _run(query: str) -> ExecutionResult:
             async with sem:
@@ -247,7 +251,15 @@ class Agent:
 
         Returns:
             Gateway response dict.
+
+        .. deprecated::
+            Use :meth:`set_tool_policy` with a :class:`ToolPolicy` instead.
         """
+        warnings.warn(
+            "configure_tools() is deprecated. Use set_tool_policy(ToolPolicy(...)) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         params: dict[str, Any] = {
             "sessionKey": self.session_key,
             "tools": [t.model_dump() for t in tools],
@@ -315,9 +327,112 @@ class Agent:
         """
         return await self._client.gateway.call("agent.wait", {"runId": run_id})
 
+    async def set_tool_policy(self, policy: "ToolPolicy") -> dict[str, Any]:
+        """Set the tool policy for this agent at runtime via ``config.patch``.
+
+        Args:
+            policy: The :class:`~openclaw_sdk.tools.policy.ToolPolicy` to apply.
+
+        Returns:
+            Gateway response dict.
+        """
+        return await self._patch_agent_config({"tools": policy.to_openclaw()})
+
+    async def deny_tools(self, *tools: str) -> dict[str, Any]:
+        """Add tools to this agent's deny list at runtime.
+
+        Args:
+            *tools: Tool names to deny (e.g. ``"browser"``, ``"group:runtime"``).
+
+        Returns:
+            Gateway response dict.
+        """
+        current = await self._get_agent_tools_config()
+        deny_list = sorted(set(current.get("deny", [])) | set(tools))
+        return await self._patch_agent_config({"tools": {**current, "deny": deny_list}})
+
+    async def allow_tools(self, *tools: str) -> dict[str, Any]:
+        """Add tools to this agent's ``alsoAllow`` list at runtime.
+
+        Args:
+            *tools: Tool names to additionally allow.
+
+        Returns:
+            Gateway response dict.
+        """
+        current = await self._get_agent_tools_config()
+        also = sorted(set(current.get("alsoAllow", [])) | set(tools))
+        return await self._patch_agent_config({"tools": {**current, "alsoAllow": also}})
+
+    async def add_mcp_server(
+        self,
+        name: str,
+        server: "StdioMcpServer | HttpMcpServer",
+    ) -> dict[str, Any]:
+        """Add or replace an MCP server in this agent's config.
+
+        Args:
+            name: Server name (e.g. ``"postgres"``).
+            server: Server config from :class:`~openclaw_sdk.mcp.server.McpServer`.
+
+        Returns:
+            Gateway response dict.
+        """
+        current_servers = await self._get_agent_mcp_config()
+        current_servers[name] = server.to_openclaw()
+        return await self._patch_agent_config({"mcpServers": current_servers})
+
+    async def remove_mcp_server(self, name: str) -> dict[str, Any]:
+        """Remove an MCP server from this agent's config.
+
+        Args:
+            name: Server name to remove.
+
+        Returns:
+            Gateway response dict.
+        """
+        current_servers = await self._get_agent_mcp_config()
+        current_servers.pop(name, None)
+        return await self._patch_agent_config({"mcpServers": current_servers})
+
     # ------------------------------------------------------------------ #
     # Internal helpers
     # ------------------------------------------------------------------ #
+
+    async def _get_full_config(self) -> tuple[dict[str, Any], str | None]:
+        """Read current OpenClaw config, return (parsed_dict, base_hash)."""
+        result = await self._client.gateway.call("config.get", {})
+        raw_str = result.get("raw", "{}")
+        parsed = json.loads(raw_str) if isinstance(raw_str, str) else {}
+        return parsed, result.get("hash")
+
+    async def _get_agent_tools_config(self) -> dict[str, Any]:
+        """Read this agent's current tools config section."""
+        parsed, _ = await self._get_full_config()
+        agent = parsed.get("agents", {}).get(self.agent_id, {})
+        tools = agent.get("tools", {})
+        return tools if isinstance(tools, dict) else {}
+
+    async def _get_agent_mcp_config(self) -> dict[str, Any]:
+        """Read this agent's current mcpServers config."""
+        parsed, _ = await self._get_full_config()
+        agent: dict[str, Any] = parsed.get("agents", {}).get(self.agent_id, {})
+        mcp: dict[str, Any] = agent.get("mcpServers", {})
+        return mcp
+
+    async def _patch_agent_config(self, updates: dict[str, Any]) -> dict[str, Any]:
+        """Read-modify-write this agent's config via ``config.patch``."""
+        parsed, base_hash = await self._get_full_config()
+        if "agents" not in parsed:
+            parsed["agents"] = {}
+        if self.agent_id not in parsed["agents"]:
+            parsed["agents"][self.agent_id] = {}
+        parsed["agents"][self.agent_id].update(updates)
+
+        params: dict[str, Any] = {"raw": json.dumps(parsed, indent=2)}
+        if base_hash is not None:
+            params["baseHash"] = base_hash
+        return await self._client.gateway.call("config.patch", params)
 
     async def _execute_impl(
         self,

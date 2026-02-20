@@ -5,6 +5,9 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from openclaw_sdk.mcp.server import HttpMcpServer, StdioMcpServer
+from openclaw_sdk.tools.policy import ToolPolicy
+
 
 class ClientConfig(BaseModel):
     mode: Literal["local", "protocol", "openai_compat", "auto"] = "auto"
@@ -32,6 +35,26 @@ class AgentConfig(BaseModel):
     enable_memory: bool = True
     memory_backend: Literal["memory", "redis"] = "memory"
     permission_mode: Literal["accept", "confirm", "reject"] = "accept"
+    tool_policy: ToolPolicy | None = None
+    mcp_servers: dict[str, StdioMcpServer | HttpMcpServer] | None = None
+
+    def to_openclaw_agent(self) -> dict[str, Any]:
+        """Serialize to OpenClaw's native agent config JSON structure."""
+        result: dict[str, Any] = {}
+        if self.name:
+            result["name"] = self.name
+        if self.system_prompt != "You are a helpful assistant.":
+            result["systemPrompt"] = self.system_prompt
+        if self.tool_policy is not None:
+            result["tools"] = self.tool_policy.to_openclaw()
+        elif self.tools:
+            result["tools"] = self.tools
+        if self.mcp_servers:
+            result["mcpServers"] = {
+                name: server.to_openclaw()
+                for name, server in self.mcp_servers.items()
+            }
+        return result
 
 
 class ExecutionOptions(BaseModel):

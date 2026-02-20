@@ -255,6 +255,9 @@ class OpenClawClient:
         Reads the current config with ``config.get``, merges the new agent
         definition, then writes back with ``config.set``.
 
+        When *tool_policy* or *mcp_servers* are set on *config*, uses the
+        OpenClaw-native serialization via :meth:`AgentConfig.to_openclaw_agent`.
+
         Args:
             config: :class:`~openclaw_sdk.core.config.AgentConfig` for the new agent.
 
@@ -269,8 +272,15 @@ class OpenClawClient:
 
         if "agents" not in parsed:
             parsed["agents"] = {}
-        agent_data = config.model_dump(exclude_none=True)
-        agent_data.pop("agent_id", None)
+
+        # Use OpenClaw-native serialization when new fields are set
+        if config.tool_policy is not None or config.mcp_servers is not None:
+            agent_data = config.to_openclaw_agent()
+        else:
+            # Legacy path: backward compatible
+            agent_data = config.model_dump(exclude_none=True)
+            agent_data.pop("agent_id", None)
+
         parsed["agents"][config.agent_id] = agent_data
 
         new_raw = json.dumps(parsed, indent=2)
