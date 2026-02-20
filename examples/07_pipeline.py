@@ -1,5 +1,9 @@
 # RUN: python examples/07_pipeline.py
-"""Pipeline — chain three agents: researcher -> writer -> reviewer."""
+"""Pipeline — chain three agents: researcher -> writer -> reviewer.
+
+Demonstrates: Pipeline chaining with {variable} templates,
+agent.reset_memory() before pipeline, and agent.get_memory_status() after.
+"""
 
 import asyncio
 
@@ -20,8 +24,10 @@ async def main() -> None:
     mock = MockGateway()
     await mock.connect()
 
-    # Register chat.send — returns the same runId for every call
+    # Register gateway responses
     mock.register("chat.send", {"runId": "run1", "status": "started"})
+    mock.register("sessions.reset", {"ok": True})
+    mock.register("sessions.preview", {"sessions": [{"key": "agent:researcher:main", "totalTokens": 1200}]})
 
     # Pre-emit all three DONE events upfront.
     # Each agent.execute() call subscribes and drains one DONE event in order.
@@ -40,6 +46,11 @@ async def main() -> None:
 
     client = OpenClawClient(config=ClientConfig(), gateway=mock)
 
+    # Reset agent memory before starting a fresh pipeline
+    researcher = client.get_agent("researcher")
+    await researcher.reset_memory()
+    print("Cleared researcher memory for a clean pipeline run.")
+
     pipeline = (
         Pipeline(client)
         .add_step("research", "researcher", "Research this topic: {topic}")
@@ -47,7 +58,7 @@ async def main() -> None:
         .add_step("review",   "reviewer",   "Review this article: {write}")
     )
 
-    print("Running pipeline: researcher -> writer -> reviewer")
+    print("\nRunning pipeline: researcher -> writer -> reviewer")
     print("Topic: AI in 2025\n")
 
     result = await pipeline.run(topic="AI in 2025")
@@ -59,6 +70,10 @@ async def main() -> None:
     for step_name, step_result in result.steps.items():
         print(f"[{step_name}]")
         print(f"  {step_result.content}\n")
+
+    # Check memory status after pipeline (shows token usage)
+    mem_status = await researcher.get_memory_status()
+    print(f"Researcher memory status: {mem_status}")
 
     await client.close()
 

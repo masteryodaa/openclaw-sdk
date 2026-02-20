@@ -6,8 +6,8 @@ from openclaw_sdk.__version__ import __version__
 # Declare the range of OpenClaw gateway versions this SDK release supports.
 # SDK startup may optionally warn when the connected OpenClaw is outside this range.
 __openclaw_compat__ = {
-    "min": "1.0.0",           # Minimum supported OpenClaw version
-    "max_tested": "1.x",      # Highest version tested against
+    "min": "2026.2.0",              # Minimum supported OpenClaw version
+    "max_tested": "2026.2.3-1",     # Highest version tested against
 }
 
 from openclaw_sdk.core.agent import Agent

@@ -1,5 +1,8 @@
 # RUN: python examples/03_fastapi_backend.py
-"""FastAPI backend — create an agent router backed by MockGateway.
+"""FastAPI backend — create agent, channel, and admin routers backed by MockGateway.
+
+Demonstrates: create_agent_router(), create_channel_router(), create_admin_router(),
+and the full set of SDK routers available for FastAPI integration.
 
 Run the server with:
     uvicorn examples.03_fastapi_backend:app --reload
@@ -18,7 +21,11 @@ from openclaw_sdk.gateway.mock import MockGateway
 
 try:
     from fastapi import FastAPI
-    from openclaw_sdk.integrations.fastapi import create_agent_router
+    from openclaw_sdk.integrations.fastapi import (
+        create_admin_router,
+        create_agent_router,
+        create_channel_router,
+    )
 
     _FASTAPI_AVAILABLE = True
 except ImportError:
@@ -32,7 +39,6 @@ except ImportError:
 if _FASTAPI_AVAILABLE:
     app = FastAPI(title="OpenClaw SDK Demo", version="0.1.0")
 
-    # The client is initialised during startup so we can use async connect().
     _client: OpenClawClient | None = None
 
     @app.on_event("startup")
@@ -43,8 +49,12 @@ if _FASTAPI_AVAILABLE:
             "chat.send",
             lambda _params: {"runId": "demo-run", "status": "started"},
         )
+        mock.register("channels.status", {
+            "channelOrder": ["whatsapp"],
+            "channels": {"whatsapp": {"configured": False, "linked": False}},
+        })
+        mock.register("sessions.list", {"count": 0, "sessions": []})
         await mock.connect()
-        # Pre-emit one DONE event so the first POST /agents/*/execute call works
         mock.emit_event(
             StreamEvent(
                 event_type=EventType.DONE,
@@ -52,18 +62,30 @@ if _FASTAPI_AVAILABLE:
             )
         )
         _client = OpenClawClient(config=ClientConfig(), gateway=mock)
-        # Attach the agent router after the client is ready
+        # Attach all three routers: agents, channels, admin
         app.include_router(create_agent_router(_client, prefix="/agents"))
+        app.include_router(create_channel_router(_client, prefix="/channels"))
+        app.include_router(create_admin_router(_client, prefix="/admin"))
 
     @app.get("/")
     async def root() -> dict:
         return {
             "message": "OpenClaw SDK FastAPI demo",
             "note": "Uses MockGateway — no live OpenClaw required",
-            "endpoints": [
-                "GET  /agents/health",
-                "POST /agents/{agent_id}/execute",
-            ],
+            "endpoints": {
+                "agents": [
+                    "GET  /agents/health",
+                    "POST /agents/{agent_id}/execute",
+                ],
+                "channels": [
+                    "GET  /channels/status",
+                    "POST /channels/{name}/login",
+                ],
+                "admin": [
+                    "GET  /admin/skills",
+                    "GET  /admin/schedules",
+                ],
+            },
         }
 
 

@@ -1,10 +1,14 @@
 # RUN: python examples/05_tool_config.py
-"""Tool configuration — build AgentConfig with typed tool configs and print as JSON."""
+"""Tool configuration — build typed tool configs and apply them at runtime.
+
+Demonstrates: static AgentConfig tool wiring + dynamic agent.configure_tools().
+"""
 
 import asyncio
 import json
 
-from openclaw_sdk import AgentConfig
+from openclaw_sdk import OpenClawClient, ClientConfig, AgentConfig
+from openclaw_sdk.gateway.mock import MockGateway
 from openclaw_sdk.tools.config import (
     BrowserToolConfig,
     DatabaseToolConfig,
@@ -46,7 +50,7 @@ async def main() -> None:
         max_results=5,
     )
 
-    # Wire tool configs into an AgentConfig
+    # Wire tool configs into an AgentConfig (static configuration)
     agent_config = AgentConfig(
         agent_id="data-analyst",
         name="Data Analyst",
@@ -72,6 +76,25 @@ async def main() -> None:
         config_dict = tool.model_dump()
         for k, v in config_dict.items():
             print(f"    {k}: {v!r}")
+
+    # --- Dynamic tool configuration at runtime ---
+    print("\n" + "=" * 50)
+    print("Dynamic tool configuration with agent.configure_tools()")
+    print("=" * 50)
+
+    mock = MockGateway()
+    await mock.connect()
+    mock.register("config.setTools", {"ok": True, "tools": ["database", "files"]})
+
+    client = OpenClawClient(config=ClientConfig(), gateway=mock)
+    agent = client.get_agent("data-analyst")
+
+    # Apply tools to a running agent via the gateway
+    result = await agent.configure_tools([db_tool, file_tool])
+    print(f"\n  configure_tools() result: {result}")
+    print("  Tools applied at runtime without restarting the agent.")
+
+    await client.close()
 
 
 if __name__ == "__main__":
