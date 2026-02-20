@@ -25,7 +25,7 @@ def run_sync(coro: Coroutine[Any, Any, T]) -> T:
         Any exception raised by *coro*.
     """
     try:
-        loop = asyncio.get_running_loop()
+        asyncio.get_running_loop()
     except RuntimeError:
         # No running loop — safe to create a fresh one.
         return asyncio.run(coro)

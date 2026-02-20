@@ -112,3 +112,20 @@ async def test_with_timeout_propagates_inner_exception() -> None:
 
     with pytest.raises(RuntimeError, match="inner error"):
         await with_timeout(_boom(), seconds=5.0)
+
+
+# ---------------------------------------------------------------------------
+# run_sync — ThreadPoolExecutor path (called from running loop)
+# ---------------------------------------------------------------------------
+
+
+async def test_run_sync_in_running_loop() -> None:
+    """run_sync works when called from within an async context (uses ThreadPoolExecutor)."""
+
+    async def _coro() -> str:
+        return "from-thread"
+
+    # Inside an async test the event loop is already running, so run_sync
+    # takes the ThreadPoolExecutor path (lines 36-38 of async_helpers.py).
+    result = run_sync(_coro())
+    assert result == "from-thread"

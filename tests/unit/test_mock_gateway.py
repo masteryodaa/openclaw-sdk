@@ -175,3 +175,30 @@ async def test_subscribe_filters_by_event_type() -> None:
 
     assert len(received) == 1
     assert received[0].event_type == EventType.CONTENT
+
+
+# ------------------------------------------------------------------ #
+# subscribe() — disconnected guard
+# ------------------------------------------------------------------ #
+
+
+async def test_subscribe_raises_when_disconnected() -> None:
+    gw = MockGateway()
+    with pytest.raises(RuntimeError, match="not connected"):
+        await gw.subscribe()
+
+
+# ------------------------------------------------------------------ #
+# reset() — clears queue items
+# ------------------------------------------------------------------ #
+
+
+async def test_reset_clears_queued_events() -> None:
+    gw = MockGateway()
+    await gw.connect()
+    gw.emit_event(StreamEvent(event_type=EventType.CONTENT, data={}))
+    gw.reset()
+    # After reset the queue should be empty; close_stream + subscribe yields nothing.
+    gw.close_stream()
+    events = [e async for e in await gw.subscribe()]
+    assert events == []

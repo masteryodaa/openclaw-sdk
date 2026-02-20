@@ -3,8 +3,6 @@ from __future__ import annotations
 
 import logging
 
-import structlog
-
 from openclaw_sdk.utils.logging import configure_logging, get_logger
 
 

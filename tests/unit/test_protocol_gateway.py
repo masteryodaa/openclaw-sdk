@@ -12,7 +12,6 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from openclaw_sdk.core.constants import EventType
 from openclaw_sdk.core.exceptions import GatewayError
 from openclaw_sdk.core.types import StreamEvent
 from openclaw_sdk.gateway.protocol import ProtocolGateway, _load_token

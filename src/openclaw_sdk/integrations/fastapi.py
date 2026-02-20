@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """FastAPI integration helpers for the OpenClaw SDK.
 
 Usage::
@@ -21,12 +19,14 @@ Requires the ``fastapi`` extra::
     pip install openclaw-sdk[fastapi]
 """
 
+from __future__ import annotations
+
 import os
 from typing import Any
 
 try:
-    from fastapi import APIRouter, HTTPException  # type: ignore[import-not-found]
-    from fastapi.responses import JSONResponse  # type: ignore[import-not-found]
+    from fastapi import APIRouter, HTTPException
+    from fastapi.responses import JSONResponse
     from pydantic import BaseModel as _FaBaseModel
 except ImportError as _err:  # pragma: no cover
     raise ImportError(
@@ -241,6 +241,6 @@ def create_admin_router(
             result = await client.skills.install_skill(name)
         except OpenClawError as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
-        return JSONResponse(content=result)
+        return JSONResponse(content=result.model_dump())
 
     return router

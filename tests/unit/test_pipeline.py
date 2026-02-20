@@ -152,7 +152,7 @@ async def test_run_multiple_variables_in_prompt() -> None:
 @pytest.mark.asyncio
 async def test_run_step_output_feeds_next_step() -> None:
     client = MockClient()
-    agent1 = client.register("agent1", _make_result(content="topic: AI"))
+    client.register("agent1", _make_result(content="topic: AI"))
     agent2 = client.register("agent2", _make_result(content="article about AI"))
 
     pipeline = (
@@ -278,3 +278,35 @@ async def test_run_collects_files_from_all_steps() -> None:
     assert len(result.all_files) == 2
     assert file1 in result.all_files
     assert file2 in result.all_files
+
+
+# ---------------------------------------------------------------------------
+# run() — empty pipeline raises PipelineError
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_run_raises_pipeline_error_when_no_steps() -> None:
+    from openclaw_sdk.core.exceptions import PipelineError
+
+    client = MockClient()
+    pipeline = Pipeline(client)
+    with pytest.raises(PipelineError, match="no steps"):
+        await pipeline.run()
+
+
+# ---------------------------------------------------------------------------
+# run() — missing template variable returns failure PipelineResult
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_run_missing_variable_returns_failure() -> None:
+    client = MockClient()
+    client.register("a1", _make_result(content="ok"))
+    pipeline = Pipeline(client).add_step("step1", "a1", "Hello {missing_var}!")
+
+    result = await pipeline.run()
+
+    assert result.success is False
+    assert "missing_var" in result.final_result.content

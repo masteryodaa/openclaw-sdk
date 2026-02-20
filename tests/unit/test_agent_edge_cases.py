@@ -1,18 +1,16 @@
 """Edge case tests for core/agent.py."""
 from __future__ import annotations
 
-import asyncio
 import unittest.mock as mock_lib
 
 import pytest
 
-from openclaw_sdk.core.agent import Agent
 from openclaw_sdk.core.client import OpenClawClient
 from openclaw_sdk.core.config import ClientConfig, ExecutionOptions
 from openclaw_sdk.core.constants import EventType
-from openclaw_sdk.core.exceptions import AgentExecutionError, OpenClawError
+from openclaw_sdk.core.exceptions import AgentExecutionError
 from openclaw_sdk.core.exceptions import TimeoutError as OcTimeoutError
-from openclaw_sdk.core.types import ExecutionResult, StreamEvent
+from openclaw_sdk.core.types import StreamEvent
 from openclaw_sdk.gateway.mock import MockGateway
 
 
@@ -397,4 +395,46 @@ async def test_execute_stream_delegates_to_gateway_subscribe() -> None:
             break
 
     assert any(e.event_type == EventType.DONE for e in events)
+    await client.close()
+
+
+async def test_execute_stream_breaks_internally_on_done() -> None:
+    """_yield_events breaks its own loop after yielding DONE (covers line 148)."""
+    client = await _make_connected_client()
+    mock = _get_mock(client)
+
+    mock.register("chat.send", {"runId": "rs2"})
+    mock.emit_event(StreamEvent(event_type=EventType.DONE, data={"payload": {}}))
+
+    agent = client.get_agent("bot")
+    stream = await agent.execute_stream("query")
+
+    # Consume ALL events without a manual break; _yield_events stops itself on DONE.
+    events = [event async for event in stream]
+
+    assert len(events) == 1
+    assert events[0].event_type == EventType.DONE
+    await client.close()
+
+
+async def test_execute_stream_with_idempotency_key() -> None:
+    """execute_stream forwards idempotency_key to the gateway params (covers line 134)."""
+    client = await _make_connected_client()
+    mock = _get_mock(client)
+
+    mock.register("chat.send", {"runId": "rs3"})
+    mock.emit_event(StreamEvent(event_type=EventType.DONE, data={"payload": {}}))
+
+    agent = client.get_agent("bot")
+    stream = await agent.execute_stream("query", idempotency_key="idem-xyz")
+    [_ async for _ in stream]  # consume all events
+
+    mock.assert_called_with(
+        "chat.send",
+        {
+            "sessionKey": "agent:bot:main",
+            "message": "query",
+            "idempotencyKey": "idem-xyz",
+        },
+    )
     await client.close()

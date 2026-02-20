@@ -216,3 +216,42 @@ def test_build_gateway_uses_openai_compat_when_base_url_set() -> None:
     config = ClientConfig(openai_base_url="http://localhost:8080")
     gw = OpenClawClient._build_gateway(config)
     assert isinstance(gw, OpenAICompatGateway)
+
+
+# ---------------------------------------------------------------------------
+# connect() factory classmethod
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_connect_factory_creates_connected_client() -> None:
+    """connect() builds and connects a gateway, then returns an OpenClawClient."""
+    import unittest.mock as mock_lib
+
+    mock_gw = MockGateway()
+    with mock_lib.patch.object(OpenClawClient, "_build_gateway", return_value=mock_gw):
+        client = await OpenClawClient.connect(gateway_ws_url="ws://localhost:9999/gw")
+
+    assert isinstance(client, OpenClawClient)
+    assert mock_gw._connected is True
+    await client.close()
+
+
+@pytest.mark.asyncio
+async def test_connect_factory_passes_callbacks() -> None:
+    """connect() forwards callbacks= kwarg to the client instance."""
+    import unittest.mock as mock_lib
+    from openclaw_sdk.callbacks.handler import CallbackHandler
+
+    class _CB(CallbackHandler):
+        pass
+
+    cb = _CB()
+    mock_gw = MockGateway()
+    with mock_lib.patch.object(OpenClawClient, "_build_gateway", return_value=mock_gw):
+        client = await OpenClawClient.connect(
+            gateway_ws_url="ws://localhost:9999/gw", callbacks=[cb]
+        )
+
+    assert cb in client._callbacks
+    await client.close()
