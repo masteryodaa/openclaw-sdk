@@ -5,6 +5,7 @@ import socket
 from typing import TYPE_CHECKING, Any
 
 from openclaw_sdk.approvals.manager import ApprovalManager
+from openclaw_sdk.cache.base import ResponseCache
 from openclaw_sdk.callbacks.handler import CallbackHandler
 from openclaw_sdk.channels.manager import ChannelManager
 from openclaw_sdk.config.manager import ConfigManager
@@ -59,10 +60,12 @@ class OpenClawClient:
         config: ClientConfig,
         gateway: Gateway,
         callbacks: list[CallbackHandler] | None = None,
+        cache: ResponseCache | None = None,
     ) -> None:
         self._config = config
         self._gateway = gateway
         self._callbacks: list[CallbackHandler] = list(callbacks or [])
+        self._cache = cache
 
         # Lazy-initialised manager instances
         self._channels: ChannelManager | None = None

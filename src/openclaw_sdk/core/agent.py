@@ -97,6 +97,13 @@ class Agent:
         t0 = time.monotonic()
 
         try:
+            # Check cache before hitting the gateway.
+            if self._client._cache is not None:
+                cached = await self._client._cache.get(self.agent_id, query)
+                if cached is not None:
+                    await resolved_cbs.on_execution_end(self.agent_id, cached)
+                    return cached
+
             params: dict[str, Any] = {
                 "sessionKey": self.session_key,
                 "message": query,
@@ -105,6 +112,11 @@ class Agent:
                 params["idempotencyKey"] = idempotency_key
 
             result = await self._execute_impl(params, timeout, resolved_cbs, t0)
+
+            # Store successful results in cache.
+            if self._client._cache is not None and result.success:
+                await self._client._cache.set(self.agent_id, query, result)
+
             await resolved_cbs.on_execution_end(self.agent_id, result)
             return result
 

@@ -69,6 +69,7 @@ from openclaw_sdk.tools.config import (
     WebSearchToolConfig,
 )
 from openclaw_sdk.approvals.manager import ApprovalManager
+from openclaw_sdk.cache.base import InMemoryCache, ResponseCache
 from openclaw_sdk.config.manager import ConfigManager
 from openclaw_sdk.devices.manager import DeviceManager
 from openclaw_sdk.nodes.manager import NodeManager
@@ -139,4 +140,6 @@ __all__ = [
     "ApprovalManager",
     "NodeManager",
     "OpsManager",
+    "ResponseCache",
+    "InMemoryCache",
 ]
