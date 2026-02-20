@@ -1,6 +1,15 @@
 """OpenClaw Python SDK — Wrap. Enhance. Ship."""
 
 from openclaw_sdk.__version__ import __version__
+
+# Compatibility metadata (Section 8.2 of spec)
+# Declare the range of OpenClaw gateway versions this SDK release supports.
+# SDK startup may optionally warn when the connected OpenClaw is outside this range.
+__openclaw_compat__ = {
+    "min": "1.0.0",           # Minimum supported OpenClaw version
+    "max_tested": "1.x",      # Highest version tested against
+}
+
 from openclaw_sdk.core.agent import Agent
 from openclaw_sdk.core.client import OpenClawClient
 from openclaw_sdk.channels.config import (
@@ -59,10 +68,15 @@ from openclaw_sdk.tools.config import (
     ToolConfig,
     WebSearchToolConfig,
 )
+from openclaw_sdk.approvals.manager import ApprovalManager
+from openclaw_sdk.config.manager import ConfigManager
+from openclaw_sdk.nodes.manager import NodeManager
+from openclaw_sdk.ops.manager import OpsManager
 from openclaw_sdk.webhooks.manager import WebhookConfig, WebhookManager
 
 __all__ = [
     "__version__",
+    "__openclaw_compat__",
     "OpenClawClient",
     "Agent",
     "ClientConfig",
@@ -119,4 +133,8 @@ __all__ = [
     "ScheduleManager",
     "ScheduleConfig",
     "CronJob",
+    "ConfigManager",
+    "ApprovalManager",
+    "NodeManager",
+    "OpsManager",
 ]

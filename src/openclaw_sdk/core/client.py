@@ -1,19 +1,27 @@
 from __future__ import annotations
 
+import json
 import socket
 from typing import TYPE_CHECKING, Any
 
+from openclaw_sdk.approvals.manager import ApprovalManager
 from openclaw_sdk.callbacks.handler import CallbackHandler
 from openclaw_sdk.channels.manager import ChannelManager
-from openclaw_sdk.core.config import ClientConfig
+from openclaw_sdk.config.manager import ConfigManager
+from openclaw_sdk.core.config import AgentConfig, ClientConfig
+from openclaw_sdk.core.constants import AgentStatus
 from openclaw_sdk.core.exceptions import ConfigurationError
-from openclaw_sdk.core.types import HealthStatus
+from openclaw_sdk.core.types import AgentSummary, HealthStatus
 from openclaw_sdk.gateway.base import Gateway
+from openclaw_sdk.nodes.manager import NodeManager
+from openclaw_sdk.ops.manager import OpsManager
 from openclaw_sdk.scheduling.manager import ScheduleManager
 from openclaw_sdk.skills.clawhub import ClawHub
 from openclaw_sdk.skills.manager import SkillManager
+from openclaw_sdk.webhooks.manager import WebhookManager
 
 if TYPE_CHECKING:
+    from openclaw_sdk.channels.config import ChannelConfig
     from openclaw_sdk.core.agent import Agent
     from openclaw_sdk.pipeline.pipeline import Pipeline
 
@@ -60,6 +68,11 @@ class OpenClawClient:
         self._scheduling: ScheduleManager | None = None
         self._skills: SkillManager | None = None
         self._clawhub: ClawHub | None = None
+        self._webhooks: WebhookManager | None = None
+        self._config_mgr: ConfigManager | None = None
+        self._approvals: ApprovalManager | None = None
+        self._nodes: NodeManager | None = None
+        self._ops: OpsManager | None = None
 
     # ------------------------------------------------------------------ #
     # Factory
@@ -162,12 +175,57 @@ class OpenClawClient:
             self._clawhub = ClawHub()
         return self._clawhub
 
+    @property
+    def webhooks(self) -> WebhookManager:
+        """Manager for webhook operations (stub — CLI-backed)."""
+        if self._webhooks is None:
+            self._webhooks = WebhookManager()
+        return self._webhooks
+
+    @property
+    def schedules(self) -> ScheduleManager:
+        """Manager for scheduled jobs (cron) — canonical property name."""
+        if self._scheduling is None:
+            self._scheduling = ScheduleManager(self._gateway)
+        return self._scheduling
+
+    @property
+    def config_mgr(self) -> ConfigManager:
+        """Manager for OpenClaw runtime configuration (``config.*`` methods)."""
+        if self._config_mgr is None:
+            self._config_mgr = ConfigManager(self._gateway)
+        return self._config_mgr
+
+    @property
+    def approvals(self) -> ApprovalManager:
+        """Manager for execution approval requests."""
+        if self._approvals is None:
+            self._approvals = ApprovalManager(self._gateway)
+        return self._approvals
+
+    @property
+    def nodes(self) -> NodeManager:
+        """Manager for node / presence operations."""
+        if self._nodes is None:
+            self._nodes = NodeManager(self._gateway)
+        return self._nodes
+
+    @property
+    def ops(self) -> OpsManager:
+        """Manager for operational utilities (logs, updates, usage)."""
+        if self._ops is None:
+            self._ops = OpsManager(self._gateway)
+        return self._ops
+
     # ------------------------------------------------------------------ #
     # Agent & pipeline helpers
     # ------------------------------------------------------------------ #
 
     def get_agent(self, agent_id: str, session_name: str = "main") -> "Agent":
         """Return an :class:`~openclaw_sdk.core.agent.Agent` for *agent_id*.
+
+        This is a lightweight factory — no network call is made.
+        Use :meth:`create_agent` to create a new agent on the gateway.
 
         Args:
             agent_id: The agent's identifier (e.g. ``"my-agent"``).
@@ -178,6 +236,132 @@ class OpenClawClient:
         from openclaw_sdk.core.agent import Agent  # noqa: PLC0415
 
         return Agent(self, agent_id, session_name)
+
+    async def create_agent(self, config: AgentConfig) -> "Agent":
+        """Create a new agent on the gateway via read-modify-write on config.
+
+        Reads the current config with ``config.get``, merges the new agent
+        definition, then writes back with ``config.set``.
+
+        Args:
+            config: :class:`~openclaw_sdk.core.config.AgentConfig` for the new agent.
+
+        Returns:
+            An :class:`~openclaw_sdk.core.agent.Agent` connected to the new agent.
+        """
+        from openclaw_sdk.core.agent import Agent  # noqa: PLC0415
+
+        current = await self._gateway.call("config.get", {})
+        raw_str = current.get("raw", "{}")
+        parsed = json.loads(raw_str) if isinstance(raw_str, str) else {}
+
+        if "agents" not in parsed:
+            parsed["agents"] = {}
+        agent_data = config.model_dump(exclude_none=True)
+        agent_data.pop("agent_id", None)
+        parsed["agents"][config.agent_id] = agent_data
+
+        new_raw = json.dumps(parsed, indent=2)
+        await self._gateway.call("config.set", {"raw": new_raw})
+        return Agent(self, config.agent_id)
+
+    async def list_agents(self) -> list[AgentSummary]:
+        """List all agent sessions known to the gateway.
+
+        Gateway method: ``sessions.list``
+
+        Returns:
+            List of :class:`~openclaw_sdk.core.types.AgentSummary` objects.
+        """
+        result = await self._gateway.call("sessions.list", {})
+        summaries: list[AgentSummary] = []
+        for session in result.get("sessions", []):
+            # Session objects use "key" (not "sessionKey") — verified
+            key = session.get("key", "")
+            # Session key format: "agent:{agent_id}:{session_name}"
+            parts = key.split(":", 2)
+            agent_id = parts[1] if len(parts) >= 2 else key
+            status_str = session.get("status", "idle")
+            try:
+                status = AgentStatus(status_str)
+            except ValueError:
+                status = AgentStatus.IDLE
+            summaries.append(
+                AgentSummary(
+                    agent_id=agent_id,
+                    name=session.get("name"),
+                    status=status,
+                )
+            )
+        return summaries
+
+    async def delete_agent(self, agent_id: str) -> bool:
+        """Delete an agent and all its sessions from the gateway.
+
+        Gateway method: ``sessions.delete``
+        Verified param: ``{key}``
+
+        Args:
+            agent_id: The agent's identifier to delete.
+
+        Returns:
+            ``True`` on success.
+        """
+        await self._gateway.call(
+            "sessions.delete",
+            {"key": f"agent:{agent_id}:main"},
+        )
+        return True
+
+    async def configure_channel(self, config: "ChannelConfig") -> dict[str, Any]:
+        """Configure a messaging channel on the gateway via read-modify-write.
+
+        Reads the current config with ``config.get``, merges the channel
+        definition, then writes back with ``config.set``.
+
+        Args:
+            config: A :class:`~openclaw_sdk.channels.config.ChannelConfig` instance.
+
+        Returns:
+            Gateway response dict from ``config.set``.
+        """
+        current = await self._gateway.call("config.get", {})
+        raw_str = current.get("raw", "{}")
+        parsed = json.loads(raw_str) if isinstance(raw_str, str) else {}
+
+        if "channels" not in parsed:
+            parsed["channels"] = {}
+        channel_data = config.model_dump(exclude_none=True)
+        parsed["channels"][config.channel_type] = channel_data
+
+        new_raw = json.dumps(parsed, indent=2)
+        return await self._gateway.call("config.set", {"raw": new_raw})
+
+    async def list_channels(self) -> list[dict[str, Any]]:
+        """List all configured channels and their status.
+
+        Gateway method: ``channels.status``
+
+        Returns:
+            List of dicts, each representing one channel with its status fields.
+        """
+        result = await self._gateway.call("channels.status", {})
+        channels: dict[str, Any] = result.get("channels", {})
+        return [{"name": k, **v} for k, v in channels.items()]
+
+    async def remove_channel(self, channel_name: str) -> bool:
+        """Remove / logout a channel from the gateway.
+
+        Gateway method: ``channels.logout``
+
+        Args:
+            channel_name: The channel identifier (e.g. ``"whatsapp"``).
+
+        Returns:
+            ``True`` on success.
+        """
+        await self._gateway.call("channels.logout", {"channel": channel_name})
+        return True
 
     def pipeline(self) -> "Pipeline":
         """Return a new :class:`~openclaw_sdk.pipeline.pipeline.Pipeline` for this client."""
