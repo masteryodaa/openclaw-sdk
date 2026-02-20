@@ -165,6 +165,32 @@ class Agent:
             if event.event_type in (EventType.DONE, EventType.ERROR):
                 break
 
+    async def batch(
+        self,
+        queries: list[str],
+        options: ExecutionOptions | None = None,
+        callbacks: list[CallbackHandler] | None = None,
+        max_concurrency: int | None = None,
+    ) -> list[ExecutionResult]:
+        """Execute multiple queries in parallel.
+
+        Args:
+            queries: List of query strings to execute.
+            options: Shared execution options for all queries.
+            callbacks: Shared callbacks for all queries.
+            max_concurrency: Max parallel executions (default: unlimited).
+
+        Returns:
+            List of ExecutionResult in the same order as queries.
+        """
+        sem = asyncio.Semaphore(max_concurrency or len(queries))
+
+        async def _run(query: str) -> ExecutionResult:
+            async with sem:
+                return await self.execute(query, options=options, callbacks=callbacks)
+
+        return list(await asyncio.gather(*[_run(q) for q in queries]))
+
     async def execute_structured(
         self,
         query: str,
