@@ -6,6 +6,15 @@ from openclaw_sdk.tools.config import (
     ToolConfig,
     WebSearchToolConfig,
 )
+from openclaw_sdk.tools.policy import (
+    ElevatedPolicy,
+    ExecPolicy,
+    FsPolicy,
+    ToolPolicy,
+    WebFetchPolicy,
+    WebPolicy,
+    WebSearchPolicy,
+)
 
 __all__ = [
     "ToolConfig",
@@ -14,4 +23,11 @@ __all__ = [
     "BrowserToolConfig",
     "ShellToolConfig",
     "WebSearchToolConfig",
+    "ElevatedPolicy",
+    "ExecPolicy",
+    "FsPolicy",
+    "ToolPolicy",
+    "WebFetchPolicy",
+    "WebPolicy",
+    "WebSearchPolicy",
 ]
