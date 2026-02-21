@@ -4,7 +4,7 @@ import asyncio
 import base64
 import json
 import time
-import warnings
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, AsyncIterator, Type, TypeVar
 
 from pydantic import BaseModel
@@ -14,12 +14,12 @@ from openclaw_sdk.core.config import ExecutionOptions
 from openclaw_sdk.core.constants import AgentStatus, EventType
 from openclaw_sdk.core.exceptions import AgentExecutionError, OpenClawError
 from openclaw_sdk.core.exceptions import TimeoutError as OcTimeoutError
-from openclaw_sdk.core.types import ExecutionResult, StreamEvent
-from openclaw_sdk.tools.config import ToolConfig
+from openclaw_sdk.core.types import Attachment, ExecutionResult, StreamEvent
 
 if TYPE_CHECKING:
     from openclaw_sdk.core.client import OpenClawClient
     from openclaw_sdk.mcp.server import HttpMcpServer, StdioMcpServer
+    from openclaw_sdk.skills.config import SkillEntry, SkillsConfig
     from openclaw_sdk.tools.policy import ToolPolicy
 
 T = TypeVar("T", bound=BaseModel)
@@ -114,6 +114,14 @@ class Agent:
             }
             if idempotency_key is not None:
                 params["idempotencyKey"] = idempotency_key
+
+            if options and options.attachments:
+                gateway_attachments: list[dict[str, Any]] = []
+                for att in options.attachments:
+                    if isinstance(att, (str, Path)):
+                        att = Attachment.from_path(att)
+                    gateway_attachments.append(att.to_gateway())
+                params["attachments"] = gateway_attachments
 
             result = await self._execute_impl(params, timeout, resolved_cbs, t0)
 
@@ -240,31 +248,6 @@ class Agent:
         if result.get("encoding") == "base64":
             return base64.b64decode(content)
         return content.encode() if isinstance(content, str) else bytes(content)
-
-    async def configure_tools(self, tools: list[ToolConfig]) -> dict[str, Any]:
-        """Configure tools for this agent session.
-
-        Gateway method: ``config.setTools``
-
-        Args:
-            tools: List of :class:`~openclaw_sdk.tools.config.ToolConfig` instances.
-
-        Returns:
-            Gateway response dict.
-
-        .. deprecated::
-            Use :meth:`set_tool_policy` with a :class:`ToolPolicy` instead.
-        """
-        warnings.warn(
-            "configure_tools() is deprecated. Use set_tool_policy(ToolPolicy(...)) instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        params: dict[str, Any] = {
-            "sessionKey": self.session_key,
-            "tools": [t.model_dump() for t in tools],
-        }
-        return await self._client.gateway.call("config.setTools", params)
 
     async def reset_memory(self) -> bool:
         """Clear this agent's conversation memory.
@@ -395,6 +378,68 @@ class Agent:
         current_servers.pop(name, None)
         return await self._patch_agent_config({"mcpServers": current_servers})
 
+    async def set_skills(self, skills: "SkillsConfig") -> dict[str, Any]:
+        """Set the skills configuration for this agent at runtime.
+
+        Controls which bundled skills are available (including ClawHub for
+        dynamic discovery), filesystem loading, and per-skill overrides.
+
+        Args:
+            skills: The :class:`~openclaw_sdk.skills.config.SkillsConfig` to apply.
+
+        Returns:
+            Gateway response dict.
+        """
+        return await self._patch_agent_config({"skills": skills.to_openclaw()})
+
+    async def configure_skill(
+        self, name: str, entry: "SkillEntry"
+    ) -> dict[str, Any]:
+        """Add or update a single skill's configuration at runtime.
+
+        Args:
+            name: Skill name (e.g. ``"web-scraper"``).
+            entry: Per-skill config from :class:`~openclaw_sdk.skills.config.SkillEntry`.
+
+        Returns:
+            Gateway response dict.
+        """
+        current = await self._get_agent_skills_config()
+        entries = current.get("entries", {})
+        entries[name] = entry.to_openclaw()
+        current["entries"] = entries
+        return await self._patch_agent_config({"skills": current})
+
+    async def disable_skill(self, name: str) -> dict[str, Any]:
+        """Disable a specific skill at runtime.
+
+        Args:
+            name: Skill name to disable.
+
+        Returns:
+            Gateway response dict.
+        """
+        current = await self._get_agent_skills_config()
+        entries = current.get("entries", {})
+        entries.setdefault(name, {})["enabled"] = False
+        current["entries"] = entries
+        return await self._patch_agent_config({"skills": current})
+
+    async def enable_skill(self, name: str) -> dict[str, Any]:
+        """Enable a previously disabled skill at runtime.
+
+        Args:
+            name: Skill name to enable.
+
+        Returns:
+            Gateway response dict.
+        """
+        current = await self._get_agent_skills_config()
+        entries = current.get("entries", {})
+        entries.setdefault(name, {})["enabled"] = True
+        current["entries"] = entries
+        return await self._patch_agent_config({"skills": current})
+
     # ------------------------------------------------------------------ #
     # Internal helpers
     # ------------------------------------------------------------------ #
@@ -419,6 +464,13 @@ class Agent:
         agent: dict[str, Any] = parsed.get("agents", {}).get(self.agent_id, {})
         mcp: dict[str, Any] = agent.get("mcpServers", {})
         return mcp
+
+    async def _get_agent_skills_config(self) -> dict[str, Any]:
+        """Read this agent's current skills config section."""
+        parsed, _ = await self._get_full_config()
+        agent: dict[str, Any] = parsed.get("agents", {}).get(self.agent_id, {})
+        skills: dict[str, Any] = agent.get("skills", {})
+        return skills
 
     async def _patch_agent_config(self, updates: dict[str, Any]) -> dict[str, Any]:
         """Read-modify-write this agent's config via ``config.patch``."""

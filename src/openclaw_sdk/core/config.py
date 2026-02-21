@@ -5,7 +5,9 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from openclaw_sdk.core.types import Attachment
 from openclaw_sdk.mcp.server import HttpMcpServer, StdioMcpServer
+from openclaw_sdk.skills.config import SkillsConfig
 from openclaw_sdk.tools.policy import ToolPolicy
 
 
@@ -29,14 +31,13 @@ class AgentConfig(BaseModel):
     llm_provider: Literal["anthropic", "openai", "gemini", "ollama"] = "anthropic"
     llm_model: str = "claude-sonnet-4-20250514"
     llm_api_key: str | None = None
-    tools: list[str] = Field(default_factory=list)
-    tool_config: dict[str, dict[str, Any]] = Field(default_factory=dict)
     channels: list[str] = Field(default_factory=list)
     enable_memory: bool = True
     memory_backend: Literal["memory", "redis"] = "memory"
     permission_mode: Literal["accept", "confirm", "reject"] = "accept"
     tool_policy: ToolPolicy | None = None
     mcp_servers: dict[str, StdioMcpServer | HttpMcpServer] | None = None
+    skills: SkillsConfig | None = None
 
     def to_openclaw_agent(self) -> dict[str, Any]:
         """Serialize to OpenClaw's native agent config JSON structure."""
@@ -47,13 +48,15 @@ class AgentConfig(BaseModel):
             result["systemPrompt"] = self.system_prompt
         if self.tool_policy is not None:
             result["tools"] = self.tool_policy.to_openclaw()
-        elif self.tools:
-            result["tools"] = self.tools
         if self.mcp_servers:
             result["mcpServers"] = {
                 name: server.to_openclaw()
                 for name, server in self.mcp_servers.items()
             }
+        if self.skills is not None:
+            skills_data = self.skills.to_openclaw()
+            if skills_data:
+                result["skills"] = skills_data
         return result
 
 
@@ -61,4 +64,4 @@ class ExecutionOptions(BaseModel):
     timeout_seconds: int = Field(default=300, ge=1, le=3600)
     stream: bool = False
     max_tool_calls: int = Field(default=50, ge=1, le=200)
-    attachments: list[str | Path] = Field(default_factory=list)
+    attachments: list[Attachment | str | Path] = Field(default_factory=list)
