@@ -137,6 +137,30 @@ class GeneratedFile(BaseModel):
 class TokenUsage(BaseModel):
     input: int = 0
     output: int = 0
+    cache_read: int = Field(default=0, alias="cacheRead")
+    cache_write: int = Field(default=0, alias="cacheWrite")
+    total_tokens: int = Field(default=0, alias="totalTokens")
+
+    model_config = {"populate_by_name": True}
+
+    @classmethod
+    def from_gateway(cls, data: dict[str, Any]) -> TokenUsage:
+        """Create from gateway response data with camelCase field names."""
+        input_val = data.get("input", 0)
+        output_val = data.get("output", 0)
+        total_val = data.get("totalTokens", 0) or (input_val + output_val)
+        return cls.model_validate({
+            "input": input_val,
+            "output": output_val,
+            "cacheRead": data.get("cacheRead", 0),
+            "cacheWrite": data.get("cacheWrite", 0),
+            "totalTokens": total_val,
+        })
+
+    @property
+    def total(self) -> int:
+        """Total tokens: uses total_tokens if set, else input + output."""
+        return self.total_tokens if self.total_tokens else self.input + self.output
 
 
 class ExecutionResult(BaseModel):
@@ -150,6 +174,8 @@ class ExecutionResult(BaseModel):
     completed_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc)
     )
+    stop_reason: str | None = None
+    """Stop reason: ``"complete"``, ``"aborted"``, ``"error"``, ``"timeout"``."""
 
     @property
     def has_files(self) -> bool:

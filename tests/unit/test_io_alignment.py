@@ -9,7 +9,7 @@ import pytest
 from openclaw_sdk.core.config import ClientConfig, ExecutionOptions
 from openclaw_sdk.core.client import OpenClawClient
 from openclaw_sdk.core.constants import EventType
-from openclaw_sdk.core.types import Attachment, StreamEvent
+from openclaw_sdk.core.types import Attachment, StreamEvent, TokenUsage
 from openclaw_sdk.gateway.mock import MockGateway
 
 
@@ -204,3 +204,165 @@ class TestExecuteSendsAttachments:
                 break
         else:
             pytest.fail("chat.send not called")
+
+
+class TestTokenUsage:
+    def test_from_gateway_all_fields(self) -> None:
+        data = {
+            "input": 100,
+            "output": 50,
+            "cacheRead": 20,
+            "cacheWrite": 10,
+            "totalTokens": 180,
+        }
+        usage = TokenUsage.from_gateway(data)
+        assert usage.input == 100
+        assert usage.output == 50
+        assert usage.cache_read == 20
+        assert usage.cache_write == 10
+        assert usage.total_tokens == 180
+
+    def test_from_gateway_partial(self) -> None:
+        data = {"input": 100, "output": 50}
+        usage = TokenUsage.from_gateway(data)
+        assert usage.cache_read == 0
+        assert usage.cache_write == 0
+        assert usage.total_tokens == 150  # computed from input + output
+
+    def test_total_property(self) -> None:
+        usage = TokenUsage(input=100, output=50, total_tokens=160)
+        assert usage.total == 160
+
+    def test_total_property_computed(self) -> None:
+        usage = TokenUsage(input=100, output=50)
+        assert usage.total == 150  # input + output when total_tokens is 0
+
+    def test_backward_compatible(self) -> None:
+        """Existing code using TokenUsage(input=10, output=5) still works."""
+        usage = TokenUsage(input=10, output=5)
+        assert usage.input == 10
+        assert usage.output == 5
+        assert usage.cache_read == 0
+        assert usage.cache_write == 0
+
+    def test_from_gateway_empty(self) -> None:
+        usage = TokenUsage.from_gateway({})
+        assert usage.input == 0
+        assert usage.output == 0
+        assert usage.total == 0
+
+
+class TestChatSendParams:
+    async def test_sends_thinking_param(self) -> None:
+        mock = MockGateway()
+        await mock.connect()
+        mock.register("chat.send", {"runId": "r1", "status": "started"})
+        mock.emit_event(
+            StreamEvent(
+                event_type=EventType.DONE,
+                data={"payload": {"content": "result"}},
+            )
+        )
+        client = OpenClawClient(config=ClientConfig(), gateway=mock)
+        agent = client.get_agent("test")
+        options = ExecutionOptions(thinking=True)
+        await agent.execute("think about this", options=options)
+
+        for method, params in mock.calls:
+            if method == "chat.send":
+                assert params is not None
+                assert params["thinking"] is True
+                break
+        else:
+            pytest.fail("chat.send not called")
+
+    async def test_sends_deliver_param(self) -> None:
+        mock = MockGateway()
+        await mock.connect()
+        mock.register("chat.send", {"runId": "r1", "status": "started"})
+        mock.emit_event(
+            StreamEvent(
+                event_type=EventType.DONE,
+                data={"payload": {"content": "result"}},
+            )
+        )
+        client = OpenClawClient(config=ClientConfig(), gateway=mock)
+        agent = client.get_agent("test")
+        options = ExecutionOptions(deliver=False)
+        await agent.execute("no delivery", options=options)
+
+        for method, params in mock.calls:
+            if method == "chat.send":
+                assert params is not None
+                assert params["deliver"] is False
+                break
+        else:
+            pytest.fail("chat.send not called")
+
+    async def test_sends_timeout_ms(self) -> None:
+        mock = MockGateway()
+        await mock.connect()
+        mock.register("chat.send", {"runId": "r1", "status": "started"})
+        mock.emit_event(
+            StreamEvent(
+                event_type=EventType.DONE,
+                data={"payload": {"content": "result"}},
+            )
+        )
+        client = OpenClawClient(config=ClientConfig(), gateway=mock)
+        agent = client.get_agent("test")
+        options = ExecutionOptions(timeout_seconds=60)
+        await agent.execute("test", options=options)
+
+        for method, params in mock.calls:
+            if method == "chat.send":
+                assert params is not None
+                assert params["timeoutMs"] == 60000
+                break
+        else:
+            pytest.fail("chat.send not called")
+
+    async def test_no_options_no_extra_params(self) -> None:
+        mock = MockGateway()
+        await mock.connect()
+        mock.register("chat.send", {"runId": "r1", "status": "started"})
+        mock.emit_event(
+            StreamEvent(
+                event_type=EventType.DONE,
+                data={"payload": {"content": "result"}},
+            )
+        )
+        client = OpenClawClient(config=ClientConfig(), gateway=mock)
+        agent = client.get_agent("test")
+        await agent.execute("test")
+
+        for method, params in mock.calls:
+            if method == "chat.send":
+                assert params is not None
+                assert "thinking" not in params
+                assert "deliver" not in params
+                assert "timeoutMs" not in params
+                break
+        else:
+            pytest.fail("chat.send not called")
+
+    async def test_thinking_false_not_sent(self) -> None:
+        mock = MockGateway()
+        await mock.connect()
+        mock.register("chat.send", {"runId": "r1", "status": "started"})
+        mock.emit_event(
+            StreamEvent(
+                event_type=EventType.DONE,
+                data={"payload": {"content": "result"}},
+            )
+        )
+        client = OpenClawClient(config=ClientConfig(), gateway=mock)
+        agent = client.get_agent("test")
+        options = ExecutionOptions(thinking=False)
+        await agent.execute("test", options=options)
+
+        for method, params in mock.calls:
+            if method == "chat.send":
+                assert params is not None
+                assert "thinking" not in params  # False = don't send
+                break
