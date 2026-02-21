@@ -16,6 +16,7 @@ from openclaw_sdk.core.exceptions import AgentExecutionError, OpenClawError
 from openclaw_sdk.core.exceptions import TimeoutError as OcTimeoutError
 from openclaw_sdk.core.types import (
     Attachment,
+    ContentBlock,
     ExecutionResult,
     GeneratedFile,
     StreamEvent,
@@ -30,6 +31,35 @@ if TYPE_CHECKING:
     from openclaw_sdk.tools.policy import ToolPolicy
 
 T = TypeVar("T", bound=BaseModel)
+
+
+def _parse_content(raw: Any) -> tuple[str, list[ContentBlock], list[str]]:
+    """Parse gateway content -- plain string or array of content blocks.
+
+    Returns:
+        (flat_text, content_blocks, thinking_parts)
+    """
+    if isinstance(raw, str):
+        return raw, [], []
+    if isinstance(raw, list):
+        text_parts: list[str] = []
+        thinking_parts: list[str] = []
+        blocks: list[ContentBlock] = []
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            block = ContentBlock(
+                type=item.get("type", "text"),
+                text=item.get("text"),
+                thinking=item.get("thinking"),
+            )
+            blocks.append(block)
+            if block.type == "thinking" and block.thinking:
+                thinking_parts.append(block.thinking)
+            elif block.text:
+                text_parts.append(block.text)
+        return "".join(text_parts), blocks, thinking_parts
+    return str(raw) if raw else "", [], []
 
 
 class Agent:
@@ -553,6 +583,7 @@ class Agent:
         run_id: str = send_result.get("runId", "")
         content_parts: list[str] = []
         thinking_parts: list[str] = []
+        content_blocks: list[ContentBlock] = []
         tool_calls: list[ToolCall] = []
         files: list[GeneratedFile] = []
         token_usage = TokenUsage()
@@ -573,8 +604,12 @@ class Agent:
                         continue
 
                     if event.event_type == EventType.CONTENT:
-                        chunk = payload.get("content") or payload.get("text") or ""
-                        content_parts.append(chunk)
+                        raw_content = payload.get("content") or payload.get("text") or ""
+                        text, blocks, thinking = _parse_content(raw_content)
+                        if text:
+                            content_parts.append(text)
+                        content_blocks.extend(blocks)
+                        thinking_parts.extend(thinking)
                         await cb.on_stream_event(self.agent_id, event)
 
                     elif event.event_type == EventType.THINKING:
@@ -640,9 +675,12 @@ class Agent:
                         await cb.on_stream_event(self.agent_id, event)
 
                     elif event.event_type == EventType.DONE:
-                        final = payload.get("content") or payload.get("text") or ""
-                        if final:
-                            content_parts.append(final)
+                        raw_final = payload.get("content") or payload.get("text") or ""
+                        text, blocks, thinking = _parse_content(raw_final)
+                        if text:
+                            content_parts.append(text)
+                        content_blocks.extend(blocks)
+                        thinking_parts.extend(thinking)
                         # Extract token usage from DONE payload.
                         usage_data = (
                             payload.get("usage")
@@ -677,6 +715,7 @@ class Agent:
         return ExecutionResult(
             success=success,
             content="".join(content_parts),
+            content_blocks=content_blocks,
             thinking="".join(thinking_parts) or None,
             tool_calls=tool_calls,
             files=files,

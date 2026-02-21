@@ -27,7 +27,6 @@ from openclaw_sdk.core.constants import (
     EventType,
     GatewayMode,
     MemoryBackend,
-    ToolType,
 )
 from openclaw_sdk.core.exceptions import (
     AgentExecutionError,
@@ -48,6 +47,7 @@ from openclaw_sdk.core.exceptions import (
 from openclaw_sdk.core.types import (
     AgentSummary,
     Attachment,
+    ContentBlock,
     ExecutionResult,
     GeneratedFile,
     HealthStatus,
@@ -59,21 +59,35 @@ from openclaw_sdk.core.types import (
 from openclaw_sdk.memory.config import MemoryConfig
 from openclaw_sdk.scheduling.manager import CronJob, ScheduleConfig, ScheduleManager
 from openclaw_sdk.skills.clawhub import ClawHub, ClawHubSkill
+from openclaw_sdk.skills.config import SkillEntry, SkillInstallConfig, SkillLoadConfig, SkillsConfig
 from openclaw_sdk.skills.manager import SkillInfo, SkillManager
-from openclaw_sdk.tools.config import (
-    BrowserToolConfig,
-    DatabaseToolConfig,
-    FileToolConfig,
-    ShellToolConfig,
-    ToolConfig,
-    WebSearchToolConfig,
-)
 from openclaw_sdk.approvals.manager import ApprovalManager
 from openclaw_sdk.cache.base import InMemoryCache, ResponseCache
 from openclaw_sdk.config.manager import ConfigManager
 from openclaw_sdk.devices.manager import DeviceManager
 from openclaw_sdk.nodes.manager import NodeManager
 from openclaw_sdk.ops.manager import OpsManager
+from openclaw_sdk.tracing.span import Span
+from openclaw_sdk.tracing.tracer import Tracer, TracingCallbackHandler
+from openclaw_sdk.prompts.template import PromptTemplate
+from openclaw_sdk.evaluation.evaluators import (
+    ContainsEvaluator,
+    Evaluator,
+    ExactMatchEvaluator,
+    LengthEvaluator,
+    RegexEvaluator,
+)
+from openclaw_sdk.evaluation.eval_suite import EvalCase, EvalCaseResult, EvalReport, EvalSuite
+from openclaw_sdk.tools.policy import (
+    ElevatedPolicy,
+    ExecPolicy,
+    FsPolicy,
+    ToolPolicy,
+    WebFetchPolicy,
+    WebPolicy,
+    WebSearchPolicy,
+)
+from openclaw_sdk.mcp.server import HttpMcpServer, McpServer, StdioMcpServer
 from openclaw_sdk.webhooks.manager import WebhookConfig, WebhookManager
 
 __all__ = [
@@ -88,7 +102,6 @@ __all__ = [
     "AgentStatus",
     "EventType",
     "ChannelType",
-    "ToolType",
     "MemoryBackend",
     "OpenClawError",
     "ConfigurationError",
@@ -105,6 +118,7 @@ __all__ = [
     "OutputParsingError",
     "CallbackError",
     "Attachment",
+    "ContentBlock",
     "ToolCall",
     "GeneratedFile",
     "TokenUsage",
@@ -113,12 +127,6 @@ __all__ = [
     "AgentSummary",
     "HealthStatus",
     "SessionInfo",
-    "ToolConfig",
-    "DatabaseToolConfig",
-    "FileToolConfig",
-    "BrowserToolConfig",
-    "ShellToolConfig",
-    "WebSearchToolConfig",
     "ChannelConfig",
     "WhatsAppChannelConfig",
     "TelegramChannelConfig",
@@ -130,6 +138,10 @@ __all__ = [
     "SkillInfo",
     "ClawHub",
     "ClawHubSkill",
+    "SkillsConfig",
+    "SkillEntry",
+    "SkillLoadConfig",
+    "SkillInstallConfig",
     "WebhookManager",
     "WebhookConfig",
     "ScheduleManager",
@@ -142,4 +154,32 @@ __all__ = [
     "OpsManager",
     "ResponseCache",
     "InMemoryCache",
+    # v0.2 — Tracing
+    "Span",
+    "Tracer",
+    "TracingCallbackHandler",
+    # v0.2 — Prompts
+    "PromptTemplate",
+    # v0.2 — Evaluation
+    "Evaluator",
+    "ContainsEvaluator",
+    "ExactMatchEvaluator",
+    "RegexEvaluator",
+    "LengthEvaluator",
+    "EvalCase",
+    "EvalCaseResult",
+    "EvalReport",
+    "EvalSuite",
+    # Tool Policy
+    "ToolPolicy",
+    "ExecPolicy",
+    "FsPolicy",
+    "ElevatedPolicy",
+    "WebPolicy",
+    "WebSearchPolicy",
+    "WebFetchPolicy",
+    # MCP Servers
+    "McpServer",
+    "StdioMcpServer",
+    "HttpMcpServer",
 ]

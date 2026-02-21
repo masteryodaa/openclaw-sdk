@@ -163,9 +163,23 @@ class TokenUsage(BaseModel):
         return self.total_tokens if self.total_tokens else self.input + self.output
 
 
+class ContentBlock(BaseModel):
+    """A single content block from polymorphic gateway responses."""
+
+    type: str
+    text: str | None = None
+    thinking: str | None = None
+
+    @property
+    def value(self) -> str:
+        """Return the first non-None text value."""
+        return self.text or self.thinking or ""
+
+
 class ExecutionResult(BaseModel):
     success: bool
     content: str
+    content_blocks: list[ContentBlock] = Field(default_factory=list)
     files: list[GeneratedFile] = Field(default_factory=list)
     tool_calls: list[ToolCall] = Field(default_factory=list)
     thinking: str | None = None
