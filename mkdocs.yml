@@ -1,0 +1,132 @@
+site_name: OpenClaw SDK
+site_description: Python SDK for the OpenClaw autonomous AI agent framework
+site_url: https://openclaw.github.io/openclaw-sdk/
+repo_url: https://github.com/openclaw/openclaw-sdk
+repo_name: openclaw/openclaw-sdk
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: Inter
+    code: JetBrains Mono
+  icon:
+    repo: fontawesome/brands/github
+    logo: material/robot
+  features:
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - toc.follow
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [src]
+          options:
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            members_order: source
+            docstring_style: google
+            merge_init_into_class: true
+            show_if_no_docstring: false
+            signature_crossrefs: true
+            separate_signature: true
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quickstart: getting-started/quickstart.md
+    - Configuration: getting-started/configuration.md
+  - Guides:
+    - Agents & Execution: guides/agents.md
+    - Streaming: guides/streaming.md
+    - Structured Output: guides/structured-output.md
+    - Pipelines: guides/pipelines.md
+    - Callbacks & Observability: guides/callbacks.md
+    - Tool Policy: guides/tool-policy.md
+    - MCP Servers: guides/mcp-servers.md
+    - Skills & ClawHub: guides/skills.md
+    - Channels: guides/channels.md
+    - Scheduling: guides/scheduling.md
+    - Caching: guides/caching.md
+    - Cost Tracking: guides/cost-tracking.md
+    - Evaluation: guides/evaluation.md
+    - Prompt Templates: guides/prompt-templates.md
+    - FastAPI Integration: guides/fastapi.md
+  - API Reference:
+    - Client: api/client.md
+    - Agent: api/agent.md
+    - Types: api/types.md
+    - Config: api/config.md
+    - Gateway: api/gateway.md
+    - Managers: api/managers.md
+    - Pipeline: api/pipeline.md
+    - Callbacks: api/callbacks.md
+    - Tools & MCP: api/tools.md
+    - Evaluation & Tracing: api/evaluation.md
+  - Examples: examples/index.md
+  - Changelog: changelog.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/openclaw/openclaw-sdk
+  generator: false
+
+copyright: Copyright &copy; 2026 OpenClaw Contributors
