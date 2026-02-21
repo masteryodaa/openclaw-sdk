@@ -593,3 +593,121 @@ def _make_async_mock() -> Any:
     """Create an AsyncMock that also supports assert_called_once."""
     from unittest.mock import AsyncMock
     return AsyncMock()
+
+
+# ------------------------------------------------------------------ #
+# Task 5: Content Polymorphism Tests
+# ------------------------------------------------------------------ #
+
+
+class TestContentPolymorphism:
+    def test_parse_content_string(self) -> None:
+        from openclaw_sdk.core.agent import _parse_content
+        text, blocks, thinking = _parse_content("Hello world")
+        assert text == "Hello world"
+        assert blocks == []
+        assert thinking == []
+
+    def test_parse_content_text_blocks(self) -> None:
+        from openclaw_sdk.core.agent import _parse_content
+        raw = [{"type": "text", "text": "Hello "}, {"type": "text", "text": "world"}]
+        text, blocks, thinking = _parse_content(raw)
+        assert text == "Hello world"
+        assert len(blocks) == 2
+        assert blocks[0].value == "Hello "
+
+    def test_parse_content_mixed_blocks(self) -> None:
+        from openclaw_sdk.core.agent import _parse_content
+        raw = [
+            {"type": "thinking", "thinking": "Let me think..."},
+            {"type": "text", "text": "The answer is 42"},
+        ]
+        text, blocks, thinking = _parse_content(raw)
+        assert text == "The answer is 42"
+        assert len(blocks) == 2
+        assert thinking == ["Let me think..."]
+
+    def test_parse_content_empty(self) -> None:
+        from openclaw_sdk.core.agent import _parse_content
+        text, blocks, thinking = _parse_content("")
+        assert text == ""
+        assert blocks == []
+
+    def test_parse_content_none(self) -> None:
+        from openclaw_sdk.core.agent import _parse_content
+        text, blocks, thinking = _parse_content(None)
+        assert text == ""
+        assert blocks == []
+        assert thinking == []
+
+    def test_parse_content_non_dict_items_skipped(self) -> None:
+        from openclaw_sdk.core.agent import _parse_content
+        raw = [{"type": "text", "text": "ok"}, "stray-string", 42]
+        text, blocks, thinking = _parse_content(raw)
+        assert text == "ok"
+        assert len(blocks) == 1
+
+    def test_parse_content_block_value_property(self) -> None:
+        from openclaw_sdk.core.agent import _parse_content
+        raw = [
+            {"type": "thinking", "thinking": "hmm"},
+            {"type": "text", "text": "answer"},
+        ]
+        _, blocks, _ = _parse_content(raw)
+        assert blocks[0].value == "hmm"
+        assert blocks[1].value == "answer"
+
+    async def test_content_blocks_populated_on_result(self) -> None:
+        """Content blocks populated on ExecutionResult via CONTENT event."""
+        result = await _exec_with_events([
+            _ev(EventType.CONTENT, {
+                "content": [
+                    {"type": "thinking", "thinking": "Let me think..."},
+                    {"type": "text", "text": "The answer is 42"},
+                ],
+            }),
+            _ev(EventType.DONE, {"content": ""}),
+        ])
+        assert result.content == "The answer is 42"
+        assert len(result.content_blocks) == 2
+        assert result.content_blocks[0].type == "thinking"
+        assert result.content_blocks[0].thinking == "Let me think..."
+        assert result.content_blocks[1].type == "text"
+        assert result.content_blocks[1].text == "The answer is 42"
+
+    async def test_content_blocks_from_done_event(self) -> None:
+        """Content blocks populated on ExecutionResult via DONE event."""
+        result = await _exec_with_events([
+            _ev(EventType.DONE, {
+                "content": [
+                    {"type": "text", "text": "Final answer"},
+                ],
+            }),
+        ])
+        assert result.content == "Final answer"
+        assert len(result.content_blocks) == 1
+        assert result.content_blocks[0].value == "Final answer"
+
+    async def test_string_content_no_blocks(self) -> None:
+        """Plain string content leaves content_blocks empty."""
+        result = await _exec_with_events([
+            _ev(EventType.CONTENT, {"content": "Hello world"}),
+            _ev(EventType.DONE, {"content": ""}),
+        ])
+        assert result.content == "Hello world"
+        assert result.content_blocks == []
+
+    async def test_thinking_from_content_blocks_merged(self) -> None:
+        """Thinking parts from content blocks merge with THINKING events."""
+        result = await _exec_with_events([
+            _ev(EventType.THINKING, {"thinking": "Step 1. "}),
+            _ev(EventType.CONTENT, {
+                "content": [
+                    {"type": "thinking", "thinking": "Step 2. "},
+                    {"type": "text", "text": "Result"},
+                ],
+            }),
+            _ev(EventType.DONE, {"content": ""}),
+        ])
+        assert result.thinking == "Step 1. Step 2. "
+        assert result.content == "Result"
