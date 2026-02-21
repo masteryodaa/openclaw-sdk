@@ -94,6 +94,41 @@ class Agent:
         return f"agent:{self.agent_id}:{self.session_name}"
 
     # ------------------------------------------------------------------ #
+    # Params builder (shared by execute / execute_stream)
+    # ------------------------------------------------------------------ #
+
+    def _build_send_params(
+        self,
+        query: str,
+        options: ExecutionOptions | None,
+        idempotency_key: str | None,
+    ) -> dict[str, Any]:
+        """Build the ``chat.send`` params dict from query + options."""
+        params: dict[str, Any] = {
+            "sessionKey": self.session_key,
+            "message": query,
+        }
+        if idempotency_key is not None:
+            params["idempotencyKey"] = idempotency_key
+
+        if options and options.attachments:
+            gateway_attachments: list[dict[str, Any]] = []
+            for att in options.attachments:
+                if isinstance(att, (str, Path)):
+                    att = Attachment.from_path(att)
+                gateway_attachments.append(att.to_gateway())
+            params["attachments"] = gateway_attachments
+
+        if options:
+            if options.thinking:
+                params["thinking"] = True
+            if options.deliver is not None:
+                params["deliver"] = options.deliver
+            params["timeoutMs"] = options.timeout_seconds * 1000
+
+        return params
+
+    # ------------------------------------------------------------------ #
     # Public API
     # ------------------------------------------------------------------ #
 
@@ -145,27 +180,7 @@ class Agent:
                     await resolved_cbs.on_execution_end(self.agent_id, cached)
                     return cached
 
-            params: dict[str, Any] = {
-                "sessionKey": self.session_key,
-                "message": query,
-            }
-            if idempotency_key is not None:
-                params["idempotencyKey"] = idempotency_key
-
-            if options and options.attachments:
-                gateway_attachments: list[dict[str, Any]] = []
-                for att in options.attachments:
-                    if isinstance(att, (str, Path)):
-                        att = Attachment.from_path(att)
-                    gateway_attachments.append(att.to_gateway())
-                params["attachments"] = gateway_attachments
-
-            if options:
-                if options.thinking:
-                    params["thinking"] = True
-                if options.deliver is not None:
-                    params["deliver"] = options.deliver
-                params["timeoutMs"] = options.timeout_seconds * 1000
+            params = self._build_send_params(query, options, idempotency_key)
 
             result = await self._execute_impl(params, timeout, resolved_cbs, t0)
 
@@ -200,27 +215,7 @@ class Agent:
             :class:`~openclaw_sdk.core.types.StreamEvent` objects until a
             ``DONE`` or ``ERROR`` event is received.
         """
-        params: dict[str, Any] = {
-            "sessionKey": self.session_key,
-            "message": query,
-        }
-        if idempotency_key is not None:
-            params["idempotencyKey"] = idempotency_key
-
-        if options and options.attachments:
-            gateway_attachments: list[dict[str, Any]] = []
-            for att in options.attachments:
-                if isinstance(att, (str, Path)):
-                    att = Attachment.from_path(att)
-                gateway_attachments.append(att.to_gateway())
-            params["attachments"] = gateway_attachments
-
-        if options:
-            if options.thinking:
-                params["thinking"] = True
-            if options.deliver is not None:
-                params["deliver"] = options.deliver
-            params["timeoutMs"] = options.timeout_seconds * 1000
+        params = self._build_send_params(query, options, idempotency_key)
 
         subscriber = await self._client.gateway.subscribe()
         await self._client.gateway.call("chat.send", params)

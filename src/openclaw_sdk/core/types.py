@@ -71,6 +71,13 @@ class Attachment(BaseModel):
         # Resolve content
         if self.content_base64 is not None:
             b64_content = self.content_base64
+            # Estimate raw size from base64 length (~4/3 inflation).
+            estimated_size = len(b64_content) * 3 // 4
+            if estimated_size > self.MAX_SIZE_BYTES:
+                raise ValueError(
+                    f"content_base64 is approximately {estimated_size} bytes, "
+                    f"exceeding the 5 MB limit ({self.MAX_SIZE_BYTES} bytes)."
+                )
         else:
             path = Path(self.file_path)
             raw = path.read_bytes()
@@ -159,8 +166,8 @@ class TokenUsage(BaseModel):
 
     @property
     def total(self) -> int:
-        """Total tokens: uses total_tokens if set, else input + output."""
-        return self.total_tokens if self.total_tokens else self.input + self.output
+        """Total tokens: uses total_tokens if non-zero, else input + output."""
+        return self.total_tokens if self.total_tokens > 0 else self.input + self.output
 
 
 class ContentBlock(BaseModel):
