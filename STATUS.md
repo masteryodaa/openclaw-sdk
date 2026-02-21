@@ -9,67 +9,46 @@
 
 | Metric | Value |
 |--------|-------|
-| Tests | 409 passing, 3 skipped |
-| Coverage | 97% |
-| mypy | 0 errors (50 source files) |
+| Tests | 669 passing, 12 skipped |
+| Coverage | 97%+ |
+| mypy | 0 errors (66 files) |
 | ruff | 0 issues |
 | Python | 3.11+ |
-| Git commits | 5 on main + pending release commit |
-| Release status | v0.1.0 READY |
+| Version | v0.2.0 |
 
 ---
 
-## Phase Progress
+## v0.2.0 — LangChain-Parity Features
 
-| Phase | Description | Status | Notes |
-|-------|-------------|--------|-------|
-| MD1 | Scaffold, pyproject, core types/enums | DONE | All models, enums, exceptions |
-| MD2 | Gateway ABC, MockGateway, base tests | DONE | call/subscribe/connect/close/health |
-| MD3A | ProtocolGateway (WS RPC, auth) | DONE | Reconnect, backoff, auth handshake |
-| MD3B | Managers (channels, skills, scheduling) | DONE | All gateway-backed managers |
-| MD3C | Python features (pipeline, output, callbacks, cost) | DONE | All pure-Python features |
-| MD4 | Client + Agent + FastAPI integration | DONE | Full client with auto-detect |
-| MD5A | 10 example scripts | DONE | All run against MockGateway |
-| MD5B | Integration tests + coverage | DONE | 97% coverage |
-| MD5C | Type fixes + quality gate | DONE | ruff/mypy clean |
-| MD6 | README, docs, CHANGELOG | DONE | README + quickstart + changelog |
-| MD7 | Parity gap fill (v0.1 spec) | DONE | Protocol-verified, 409 tests |
-| MD8 | Release gates + final polish | DONE | docs/protocol.md, examples updated |
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Response Cache | DONE | `InMemoryCache` with TTL + LRU, wired into `Agent.execute()` |
+| Tracing / Observability | DONE | `Span`, `Tracer`, `TracingCallbackHandler` with JSON export |
+| Prompt Templates | DONE | `PromptTemplate` with `render()`, `partial()`, `+` composition |
+| Batch Execution | DONE | `Agent.batch(queries, max_concurrency=)` with semaphore |
+| Evaluation Framework | DONE | `EvalSuite` + 4 evaluators: Contains, ExactMatch, Regex, Length |
+| DeviceManager | DONE | `rotate_token()`, `revoke_token()` via verified gateway RPC |
+| ApprovalManager fix | DONE | Rewrote to use `exec.approval.resolve` (verified RPC) |
+| Agent.wait_for_run() | DONE | Via `agent.wait` gateway method |
+| Tool Policy | DONE | `ToolPolicy` presets (minimal/coding/messaging/full), fluent builders, deny/allow |
+| MCP Servers | DONE | `McpServer.stdio()` / `.http()`, per-agent MCP server config |
+| Skills Config | DONE | `SkillsConfig` for dynamic discovery via ClawHub, per-skill entries |
+| Legacy cleanup | DONE | Removed old ToolConfig classes, ToolType enum, configure_tools() |
+| Exports & docs | DONE | All new modules in `__init__.py`, CHANGELOG updated |
+| **I/O Alignment** | **DONE** | **All 8 gaps fixed — see below** |
 
----
+### I/O Alignment with OpenClaw Gateway
 
-## Release Readiness — plan.md Compliance
-
-### Section 8: Success Criteria (16/16 PASS)
-
-- [x] `pip install -e .` works (all dependencies included)
-- [x] `pytest --cov` ≥ 90% (97% actual)
-- [x] `mypy --strict` zero errors (50 files)
-- [x] `ruff check` passes
-- [x] Gateway protocol parity verified against OpenClaw 2026.2.3-1
-- [x] Required parity surfaces: chat, sessions, channels, cron, config, approvals, node/presence
-- [x] Ops wrappers: `logs.tail` (verified), `usage_summary` (aggregated from sessions)
-- [x] All 10 examples run against MockGateway
-- [x] FastAPI example with all 3 routers (agent, channel, admin)
-- [x] Pipeline chains 3 agents (researcher → writer → reviewer)
-- [x] Structured output parses into Pydantic models
-- [x] Callbacks fire in correct order
-- [x] Cost tracker calculates accurate costs
-- [x] ClawHub search/browse works via MockGateway
-- [x] README contains working quickstart code
-- [x] Compatibility matrix in docs/protocol.md + `__openclaw_compat__`
-
-### Section 8.1: Definition of Done (8/9 PASS, 1 PARTIAL non-blocking)
-
-- [x] **Protocol freeze** — docs/protocol.md Section 1 (all methods pinned for 2026.2.0–2026.2.3-1)
-- [x] **Mapping spec** — docs/protocol.md Section 2 (ExecutionResult, StreamEvent, ToolCall, etc.)
-- [x] **Handshake/auth contract** — docs/protocol.md Section 3 (flow, token sources, failure modes)
-- [x] **Reconnect/resume contract** — docs/protocol.md Section 4 (backoff, idempotency, resume)
-- [x] **Channel onboarding contract** — docs/protocol.md Section 5 (state machine, per-channel flows)
-- [~] **Live compatibility tests** — 3 integration tests exist, skip when gateway unreachable (non-blocking)
-- [x] **Version matrix** — docs/protocol.md Section 6 (tested versions, known limitations)
-- [x] **Required method coverage** — all mandatory surfaces present
-- [x] **Ops method coverage** — logs.tail, usage_summary present; update.run removed (unverified)
+| Gap | Status | Notes |
+|-----|--------|-------|
+| Attachments never sent | DONE | `Attachment.to_gateway()` with base64, size/mime validation |
+| Events ignored | DONE | THINKING/TOOL_CALL/TOOL_RESULT/FILE_GENERATED all processed |
+| No thinking param | DONE | `ExecutionOptions.thinking` forwarded to chat.send |
+| No deliver flag | DONE | `ExecutionOptions.deliver` forwarded to chat.send |
+| No timeoutMs | DONE | `timeout_seconds * 1000` forwarded as `timeoutMs` |
+| TokenUsage incomplete | DONE | `cache_read`, `cache_write`, `total_tokens` + `from_gateway()` |
+| Content not polymorphic | DONE | `ContentBlock` model, `_parse_content()`, `content_blocks` field |
+| No aborted state | DONE | `stop_reason="aborted"`, `success=False` |
 
 ---
 
@@ -77,26 +56,42 @@
 
 ### Core
 - `OpenClawClient` — factory via `.connect()`, auto-detect gateway, context manager
-- `Agent` — `execute()`, `execute_stream()`, `execute_structured()`, callbacks, timeout, idempotency
+- `Agent` — `execute()`, `execute_stream()`, `execute_structured()`, `batch()`, callbacks, timeout, idempotency
 - `ClientConfig`, `AgentConfig`, `ExecutionOptions` — Pydantic v2 models
 - Full exception hierarchy (12 exception classes)
-- All enums: `AgentStatus`, `EventType`, `ChannelType`, `GatewayMode`, `ToolType`, `MemoryBackend`
+- Enums: `AgentStatus`, `EventType`, `ChannelType`, `GatewayMode`, `MemoryBackend`
 
-### Agent Methods (MD7)
+### Agent Methods
+- `execute(query)` — with cache integration, callbacks, timeout
+- `execute_stream(query)` — WebSocket push events
 - `execute_structured(query, output_model)` — typed Pydantic model responses
+- `batch(queries, max_concurrency=)` — parallel execution
+- `wait_for_run(run_id)` — wait for specific run completion
 - `get_file(file_path)` — download generated files
-- `configure_tools(tools)` — runtime tool configuration
-- `reset_memory()` — clear conversation memory
-- `get_memory_status()` — session preview
-- `get_status()` — agent status enum
+- `set_tool_policy(policy)` — runtime tool policy changes
+- `deny_tools(*tools)` / `allow_tools(*tools)` — runtime allow/deny
+- `add_mcp_server(name, server)` / `remove_mcp_server(name)` — runtime MCP config
+- `set_skills(skills)` — runtime skills configuration
+- `configure_skill(name, entry)` / `enable_skill()` / `disable_skill()` — per-skill control
+- `reset_memory()` / `get_memory_status()` / `get_status()`
 
-### Client Methods (MD7)
-- `create_agent(AgentConfig)` — read-modify-write via config.get + config.set
-- `list_agents()` — via sessions.list
-- `delete_agent(agent_id)` — via sessions.delete
-- `configure_channel(ChannelConfig)` — read-modify-write via config.get + config.set
-- `list_channels()` — via channels.status
-- `remove_channel(channel_name)` — via channels.logout
+### Tool Policy (maps to OpenClaw's native config)
+- `ToolPolicy.minimal()` / `.coding()` / `.messaging()` / `.full()` — presets
+- `.deny(*tools)` / `.allow_tools(*tools)` — fluent builders (immutable)
+- `.with_exec(security=)` / `.with_fs(workspace_only=)` — sub-policy config
+- `ExecPolicy`, `FsPolicy`, `ElevatedPolicy`, `WebPolicy` — sub-models
+
+### MCP Servers
+- `McpServer.stdio(cmd, args, env)` — stdio transport
+- `McpServer.http(url, headers)` — streamable HTTP transport
+- Per-agent MCP server configuration
+
+### Skills / Dynamic Discovery
+- `SkillsConfig` — controls ClawHub auto-discovery, skill loading, per-skill overrides
+- `SkillEntry` — per-skill config (enabled, api_key, env)
+- `SkillLoadConfig` — watch mode, extra_dirs for skill filesystem scanning
+- `SkillInstallConfig` — package manager preferences
+- Runtime: `agent.set_skills()`, `agent.configure_skill()`, `agent.enable/disable_skill()`
 
 ### Client Properties
 - `client.channels` → ChannelManager
@@ -108,6 +103,7 @@
 - `client.approvals` → ApprovalManager
 - `client.nodes` → NodeManager
 - `client.ops` → OpsManager
+- `client.devices` → DeviceManager
 
 ### Gateways
 - `ProtocolGateway` — WebSocket RPC, auth handshake, reconnect w/ exponential backoff
@@ -115,13 +111,11 @@
 - `LocalGateway` — auto-connect to local OpenClaw
 - `MockGateway` — in-memory for testing
 
-### Managers (MD7)
-- `ConfigManager` — get, schema, set(raw), patch(raw, base_hash?), apply(raw, base_hash?)
-- `ApprovalManager` — list_requests / resolve raise NotImplementedError (push-event based)
-- `NodeManager` — system_presence, list, describe, invoke
-- `OpsManager` — logs_tail() (no params), usage_summary() (from sessions)
-
-### Python-Native Features
+### Python-Native Features (v0.2)
+- `InMemoryCache` — response caching with TTL + LRU eviction
+- `Tracer` / `Span` / `TracingCallbackHandler` — observability with JSON export
+- `PromptTemplate` — composable templates with `render()`, `partial()`, `+`
+- `EvalSuite` — evaluation framework with 4 built-in evaluators
 - `Pipeline` — chain agents with `{variable}` template passing
 - `StructuredOutput` — parse LLM responses into Pydantic models with retry
 - `CallbackHandler` / `LoggingCallbackHandler` / `CompositeCallbackHandler`
@@ -129,13 +123,12 @@
 
 ### Integration
 - FastAPI: `create_agent_router`, `create_channel_router`, `create_admin_router`
-- 10 example scripts updated with MD7 features
+- 10 example scripts
 
 ### Quality
 - `py.typed` marker (PEP 561)
 - `LICENSE` (MIT)
-- `CHANGELOG.md`
-- `README.md` + `docs/quickstart.md` + `docs/protocol.md`
+- `CHANGELOG.md`, `README.md`, `docs/quickstart.md`, `docs/protocol.md`
 - `__openclaw_compat__` = `{"min": "2026.2.0", "max_tested": "2026.2.3-1"}`
 
 ---
