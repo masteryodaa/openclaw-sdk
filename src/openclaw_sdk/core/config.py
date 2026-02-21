@@ -65,3 +65,7 @@ class ExecutionOptions(BaseModel):
     stream: bool = False
     max_tool_calls: int = Field(default=50, ge=1, le=200)
     attachments: list[Attachment | str | Path] = Field(default_factory=list)
+    thinking: bool = False
+    """Enable thinking/reasoning mode."""
+    deliver: bool | None = None
+    """Deliver to channel (None = gateway default)."""
