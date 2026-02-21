@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from openclaw_sdk.core.types import ExecutionResult
 from openclaw_sdk.evaluation import (
     ContainsEvaluator,
@@ -232,6 +234,14 @@ class TestEvalSuiteEvaluate:
         assert report.failed == 0
         assert report.pass_rate == 0.0
         assert report.case_results == []
+
+    def test_mismatched_lengths_raises(self) -> None:
+        suite = EvalSuite("mismatch")
+        suite.add_case(EvalCase(query="q1", evaluator=ContainsEvaluator("x")))
+        suite.add_case(EvalCase(query="q2", evaluator=ContainsEvaluator("y")))
+
+        with pytest.raises(ValueError, match="Expected 2 results, got 1"):
+            suite.evaluate([_result("x")])
 
 
 # ---------------------------------------------------------------------------

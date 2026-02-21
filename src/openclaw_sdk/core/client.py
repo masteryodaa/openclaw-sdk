@@ -273,19 +273,36 @@ class OpenClawClient:
         if "agents" not in parsed:
             parsed["agents"] = {}
 
-        # Use OpenClaw-native serialization when new fields are set
-        if config.tool_policy is not None or config.mcp_servers is not None:
-            agent_data = config.to_openclaw_agent()
-        else:
-            # Legacy path: backward compatible
-            agent_data = config.model_dump(exclude_none=True)
-            agent_data.pop("agent_id", None)
+        agent_data = config.to_openclaw_agent()
 
         parsed["agents"][config.agent_id] = agent_data
 
         new_raw = json.dumps(parsed, indent=2)
         await self._gateway.call("config.set", {"raw": new_raw})
         return Agent(self, config.agent_id)
+
+    async def create_agent_from_template(
+        self,
+        template_name: str,
+        *,
+        agent_id: str | None = None,
+        **overrides: Any,
+    ) -> "Agent":
+        """Create an agent from a pre-built template.
+
+        Args:
+            template_name: Template name (e.g., "customer-support").
+            agent_id: Override the default agent ID.
+            **overrides: Additional AgentConfig field overrides.
+        """
+        from openclaw_sdk.templates.registry import get_template  # noqa: PLC0415
+
+        config = get_template(template_name)
+        if agent_id is not None:
+            config.agent_id = agent_id
+        for key, value in overrides.items():
+            setattr(config, key, value)
+        return await self.create_agent(config)
 
     async def list_agents(self) -> list[AgentSummary]:
         """List all agent sessions known to the gateway.

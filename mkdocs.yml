@@ -1,5 +1,5 @@
 site_name: OpenClaw SDK
-site_description: Python SDK for the OpenClaw autonomous AI agent framework
+site_description: The official Python SDK for the OpenClaw autonomous AI agent framework
 site_url: https://openclaw.github.io/openclaw-sdk/
 repo_url: https://github.com/openclaw/openclaw-sdk
 repo_name: openclaw/openclaw-sdk
@@ -7,6 +7,7 @@ edit_uri: edit/main/docs/
 
 theme:
   name: material
+  custom_dir: docs/overrides
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
@@ -38,7 +39,6 @@ theme:
     - navigation.tabs
     - navigation.tabs.sticky
     - navigation.sections
-    - navigation.expand
     - navigation.top
     - navigation.footer
     - search.suggest
@@ -87,6 +87,9 @@ markdown_extensions:
   - toc:
       permalink: true
 
+extra_css:
+  - stylesheets/extra.css
+
 nav:
   - Home: index.md
   - Getting Started:
@@ -98,6 +101,10 @@ nav:
     - Streaming: guides/streaming.md
     - Structured Output: guides/structured-output.md
     - Pipelines: guides/pipelines.md
+    - Conditional Pipelines: guides/conditional-pipelines.md
+    - Multi-agent Coordination: guides/coordination.md
+    - Agent Templates: guides/templates.md
+    - Guardrails: guides/guardrails.md
     - Callbacks & Observability: guides/callbacks.md
     - Tool Policy: guides/tool-policy.md
     - MCP Servers: guides/mcp-servers.md
@@ -108,7 +115,9 @@ nav:
     - Cost Tracking: guides/cost-tracking.md
     - Evaluation: guides/evaluation.md
     - Prompt Templates: guides/prompt-templates.md
-    - FastAPI Integration: guides/fastapi.md
+    - Prompt Versioning: guides/prompt-versioning.md
+    - Multi-tenancy: guides/multitenancy.md
+    - Framework Integrations: guides/integrations.md
   - API Reference:
     - Client: api/client.md
     - Agent: api/agent.md
@@ -117,6 +126,8 @@ nav:
     - Gateway: api/gateway.md
     - Managers: api/managers.md
     - Pipeline: api/pipeline.md
+    - Coordination: api/coordination.md
+    - Guardrails: api/guardrails.md
     - Callbacks: api/callbacks.md
     - Tools & MCP: api/tools.md
     - Evaluation & Tracing: api/evaluation.md

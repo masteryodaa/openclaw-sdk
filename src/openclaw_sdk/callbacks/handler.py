@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC
+from typing import Any
 
 import structlog
 
@@ -115,6 +116,33 @@ class LoggingCallbackHandler(CallbackHandler):
             "stream_event",
             agent_id=agent_id,
             event_type=event.event_type,
+        )
+
+
+class CostCallbackHandler(CallbackHandler):
+    """Automatically records execution costs into a :class:`CostTracker`.
+
+    Attach to a client or pass per-call to track LLM spending automatically.
+
+    Args:
+        tracker: The :class:`CostTracker` instance to record costs into.
+        model: Default model name used for cost calculation.
+    """
+
+    def __init__(self, tracker: Any, model: str = "claude-sonnet-4-20250514") -> None:
+        self._tracker = tracker
+        self._model = model
+        self._current_query: str = ""
+
+    async def on_execution_start(self, agent_id: str, query: str) -> None:
+        self._current_query = query
+
+    async def on_execution_end(self, agent_id: str, result: ExecutionResult) -> None:
+        self._tracker.record(
+            result,
+            agent_id=agent_id,
+            model=self._model,
+            query=self._current_query,
         )
 
 

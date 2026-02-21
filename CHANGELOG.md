@@ -9,7 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+### Added — v0.3.0 Roadmap Features
+- **Agent Templates** — 8 pre-built templates (`assistant`, `customer-support`, `data-analyst`, `code-reviewer`, `researcher`, `writer`, `devops`, `mobile-jarvis`); `get_template()`, `list_templates()`, `client.create_agent_from_template()`
+- **Conditional Pipelines** — `ConditionalPipeline` with `add_branch()`, `add_parallel()`, `add_fallback()` for branching, concurrent, and fault-tolerant agent workflows
+- **Multi-agent Coordination** — `Supervisor` (sequential/parallel/round-robin delegation), `ConsensusGroup` (majority/unanimous/any voting), `AgentRouter` (predicate-based query routing)
+- **Guardrails** — `PIIGuardrail` (block/redact/warn), `CostLimitGuardrail`, `ContentFilterGuardrail`, `MaxTokensGuardrail`, `RegexFilterGuardrail`; abstract `Guardrail` base for custom validators
+- **Prompt Versioning** — `PromptStore` with save/get/list/diff/rollback/export/import; `PromptVersion` with SHA-256 hashing and tags
+- **Multi-tenancy** — `TenantWorkspace` with `TenantConfig` quotas (max agents, cost limits, model restrictions, rate limiting); agent namespacing, usage reports, tenant activation/deactivation
+- **Framework Integrations** — Flask (`create_agent_blueprint`, `create_channel_blueprint`), Django (`setup`, `get_urls`), Streamlit (`st_openclaw_chat` widget), Jupyter (`%openclaw` magic commands), Celery (`create_execute_task`, `create_batch_task`)
+- **CostCallbackHandler** — callback handler that auto-records execution costs into a `CostTracker`
+- **Attachment MIME expansion** — support for images, documents (PDF, CSV, JSON), audio (MP3, OGG, WAV), video (MP4, WebM); configurable max size (25 MB default)
+
+### Added — v0.2.x Features
 - **Tool Policy** — `ToolPolicy` with preset profiles (`minimal`, `coding`, `messaging`, `full`) and fluent builders (`.deny()`, `.allow_tools()`, `.with_exec()`, `.with_fs()`); maps directly to OpenClaw's native camelCase tool config
 - **MCP Servers** — `McpServer.stdio(cmd, args, env)` and `McpServer.http(url, headers)` for per-agent MCP server configuration
 - **Skills Config** — `SkillsConfig` for controlling dynamic tool discovery via ClawHub, skill loading, and per-skill overrides (`SkillEntry`, `SkillLoadConfig`, `SkillInstallConfig`)
@@ -17,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AgentConfig.to_openclaw_agent()` — native serialization for `create_agent()`
 
 ### Fixed — I/O Alignment with OpenClaw Gateway
-- **Attachment model** — `Attachment.to_gateway()` with base64 encoding, 5 MB size validation, image-only MIME validation; `Attachment.from_path()` factory with auto-detection
+- **Attachment model** — `Attachment.to_gateway()` with base64 encoding, configurable size validation, multi-media MIME validation; `Attachment.from_path()` factory with auto-detection
 - **TokenUsage** — added `cache_read`, `cache_write`, `total_tokens` fields with camelCase aliases; `TokenUsage.from_gateway()` classmethod; `total` property
 - **Event processing** — `_execute_impl` now handles all OpenClaw event types: THINKING, TOOL_CALL, TOOL_RESULT, FILE_GENERATED; populates `thinking`, `tool_calls`, `files`, `token_usage`, `stop_reason` on `ExecutionResult`
 - **chat.send params** — forwards `thinking`, `deliver`, `timeoutMs` to gateway; `ExecutionOptions` gains `thinking: bool` and `deliver: bool | None` fields

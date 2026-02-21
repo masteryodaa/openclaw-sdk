@@ -3,9 +3,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Protocol, runtime_checkable
 
 from openclaw_sdk.core.types import ExecutionResult
 from openclaw_sdk.evaluation.evaluators import Evaluator
+
+
+@runtime_checkable
+class _Executable(Protocol):
+    """Any object with an async execute(query) -> ExecutionResult method."""
+
+    async def execute(self, query: str) -> ExecutionResult: ...
 
 
 @dataclass
@@ -55,7 +63,15 @@ class EvalSuite:
         self._cases.append(case)
 
     def evaluate(self, results: list[ExecutionResult]) -> EvalReport:
-        """Evaluate a list of pre-collected results against the registered cases."""
+        """Evaluate a list of pre-collected results against the registered cases.
+
+        Raises:
+            ValueError: If the number of results does not match the number of cases.
+        """
+        if len(results) != len(self._cases):
+            raise ValueError(
+                f"Expected {len(self._cases)} results, got {len(results)}"
+            )
         case_results: list[EvalCaseResult] = []
         for case, result in zip(self._cases, results):
             passed = case.evaluator.evaluate(result)
@@ -71,15 +87,14 @@ class EvalSuite:
             case_results=case_results,
         )
 
-    async def run(self, agent: object) -> EvalReport:
+    async def run(self, agent: _Executable) -> EvalReport:
         """Run all cases against an agent and return an evaluation report.
 
         The agent must have an async ``execute(query: str)`` method that
-        returns an ``ExecutionResult``.  Duck typing is used so any compatible
-        object works.
+        returns an ``ExecutionResult``.
         """
         results: list[ExecutionResult] = []
         for case in self._cases:
-            result = await agent.execute(case.query)  # type: ignore[attr-defined]
+            result = await agent.execute(case.query)
             results.append(result)
         return self.evaluate(results)

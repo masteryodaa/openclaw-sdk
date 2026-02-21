@@ -43,15 +43,6 @@ class ChannelType(StrEnum):
     CUSTOM = "custom"
 
 
-class ToolType(StrEnum):
-    DATABASE = "database"
-    FILES = "files"
-    BROWSER = "browser"
-    SHELL = "shell"
-    WEB_SEARCH = "web_search"
-    CUSTOM = "custom"
-
-
 class MemoryBackend(StrEnum):
     LOCAL = "memory"
     REDIS = "redis"

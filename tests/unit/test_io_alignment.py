@@ -39,17 +39,45 @@ class TestAttachmentToGateway:
 
     def test_validates_size(self, tmp_path: Path) -> None:
         big = tmp_path / "big.png"
-        big.write_bytes(b"\x00" * (6 * 1024 * 1024))  # 6MB
+        big.write_bytes(b"\x00" * (26 * 1024 * 1024))  # 26MB > 25MB default
         att = Attachment(file_path=str(big), mime_type="image/png")
+        with pytest.raises(ValueError, match="25.*MB"):
+            att.to_gateway()
+
+    def test_validates_size_custom_limit(self, tmp_path: Path) -> None:
+        big = tmp_path / "big.png"
+        big.write_bytes(b"\x00" * (6 * 1024 * 1024))  # 6MB
+        att = Attachment(file_path=str(big), mime_type="image/png", max_size_bytes=5 * 1024 * 1024)
         with pytest.raises(ValueError, match="5.*MB"):
             att.to_gateway()
 
     def test_validates_mime_type(self, tmp_path: Path) -> None:
-        f = tmp_path / "doc.pdf"
-        f.write_bytes(b"PDF content")
-        att = Attachment(file_path=str(f), mime_type="application/pdf")
+        f = tmp_path / "doc.xyz"
+        f.write_bytes(b"Unknown content")
+        att = Attachment(file_path=str(f), mime_type="application/x-unknown")
         with pytest.raises(ValueError, match="mime"):
             att.to_gateway()
+
+    def test_accepts_pdf(self, tmp_path: Path) -> None:
+        f = tmp_path / "doc.pdf"
+        f.write_bytes(b"%PDF-1.4 content")
+        att = Attachment(file_path=str(f), mime_type="application/pdf")
+        result = att.to_gateway()
+        assert result["mimeType"] == "application/pdf"
+
+    def test_accepts_audio(self, tmp_path: Path) -> None:
+        f = tmp_path / "voice.mp3"
+        f.write_bytes(b"\xff\xfb\x90" + b"\x00" * 50)
+        att = Attachment(file_path=str(f), mime_type="audio/mpeg")
+        result = att.to_gateway()
+        assert result["mimeType"] == "audio/mpeg"
+
+    def test_accepts_video(self, tmp_path: Path) -> None:
+        f = tmp_path / "clip.mp4"
+        f.write_bytes(b"\x00\x00\x00\x1c" + b"\x00" * 50)
+        att = Attachment(file_path=str(f), mime_type="video/mp4")
+        result = att.to_gateway()
+        assert result["mimeType"] == "video/mp4"
 
     def test_from_path_factory(self, tmp_path: Path) -> None:
         img = tmp_path / "photo.png"

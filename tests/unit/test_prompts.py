@@ -101,3 +101,11 @@ def test_template_defaults_in_constructor() -> None:
     """Defaults passed in constructor are used in render()."""
     t = PromptTemplate("Hello {name}!", name="World")
     assert t.render() == "Hello World!"
+
+
+def test_template_literal_braces_preserved() -> None:
+    """Templates with JSON-like literal braces don't break."""
+    t = PromptTemplate('Return JSON like {"key": "value"} for {topic}')
+    result = t.render(topic="AI")
+    assert '{"key": "value"}' in result
+    assert "AI" in result

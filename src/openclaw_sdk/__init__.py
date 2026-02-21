@@ -70,6 +70,7 @@ from openclaw_sdk.ops.manager import OpsManager
 from openclaw_sdk.tracing.span import Span
 from openclaw_sdk.tracing.tracer import Tracer, TracingCallbackHandler
 from openclaw_sdk.prompts.template import PromptTemplate
+from openclaw_sdk.prompts.versioning import PromptStore, PromptVersion
 from openclaw_sdk.evaluation.evaluators import (
     ContainsEvaluator,
     Evaluator,
@@ -88,7 +89,32 @@ from openclaw_sdk.tools.policy import (
     WebSearchPolicy,
 )
 from openclaw_sdk.mcp.server import HttpMcpServer, McpServer, StdioMcpServer
+from openclaw_sdk.callbacks.handler import (
+    CallbackHandler,
+    CompositeCallbackHandler,
+    CostCallbackHandler,
+    LoggingCallbackHandler,
+)
+from openclaw_sdk.guardrails import (
+    ContentFilterGuardrail,
+    CostLimitGuardrail,
+    Guardrail,
+    GuardrailResult,
+    MaxTokensGuardrail,
+    PIIGuardrail,
+    RegexFilterGuardrail,
+)
+from openclaw_sdk.pipeline.pipeline import ConditionalPipeline
+from openclaw_sdk.templates.registry import get_template, list_templates
 from openclaw_sdk.webhooks.manager import WebhookConfig, WebhookManager
+from openclaw_sdk.coordination import (
+    AgentRouter,
+    ConsensusGroup,
+    ConsensusResult,
+    Supervisor,
+    SupervisorResult,
+)
+from openclaw_sdk.multitenancy import Tenant, TenantConfig, TenantWorkspace
 
 __all__ = [
     "__version__",
@@ -160,6 +186,8 @@ __all__ = [
     "TracingCallbackHandler",
     # v0.2 — Prompts
     "PromptTemplate",
+    "PromptVersion",
+    "PromptStore",
     # v0.2 — Evaluation
     "Evaluator",
     "ContainsEvaluator",
@@ -182,4 +210,32 @@ __all__ = [
     "McpServer",
     "StdioMcpServer",
     "HttpMcpServer",
+    # Callbacks
+    "CallbackHandler",
+    "LoggingCallbackHandler",
+    "CostCallbackHandler",
+    "CompositeCallbackHandler",
+    # Templates
+    "get_template",
+    "list_templates",
+    # Conditional Pipeline
+    "ConditionalPipeline",
+    # Coordination
+    "Supervisor",
+    "SupervisorResult",
+    "ConsensusGroup",
+    "ConsensusResult",
+    "AgentRouter",
+    # Guardrails
+    "Guardrail",
+    "GuardrailResult",
+    "PIIGuardrail",
+    "CostLimitGuardrail",
+    "ContentFilterGuardrail",
+    "MaxTokensGuardrail",
+    "RegexFilterGuardrail",
+    # Multi-tenancy
+    "Tenant",
+    "TenantConfig",
+    "TenantWorkspace",
 ]

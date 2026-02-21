@@ -1,9 +1,6 @@
 """Tests for Agent.batch() — parallel query execution."""
 from __future__ import annotations
 
-import pytest
-
-from openclaw_sdk.core.agent import Agent
 from openclaw_sdk.core.client import OpenClawClient
 from openclaw_sdk.core.config import ClientConfig
 from openclaw_sdk.core.constants import EventType

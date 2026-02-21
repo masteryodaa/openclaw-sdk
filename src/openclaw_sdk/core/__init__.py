@@ -5,7 +5,6 @@ from openclaw_sdk.core.constants import (
     EventType,
     GatewayMode,
     MemoryBackend,
-    ToolType,
 )
 from openclaw_sdk.core.exceptions import (
     AgentExecutionError,
@@ -44,7 +43,6 @@ __all__ = [
     "EventType",
     "GatewayMode",
     "MemoryBackend",
-    "ToolType",
     "OpenClawError",
     "ConfigurationError",
     "ConnectionError",

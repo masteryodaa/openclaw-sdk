@@ -14,8 +14,8 @@ from openclaw_sdk.core.constants import AgentStatus, EventType
 class Attachment(BaseModel):
     """A file attachment sent with a query.
 
-    OpenClaw supports image attachments only (JPEG, PNG, GIF, WebP, SVG).
-    Maximum file size is 5 MB.
+    OpenClaw supports images, documents, audio, and video attachments.
+    Default maximum file size is 25 MB (configurable via ``max_size_bytes``).
 
     Use :meth:`from_path` to create from a local file with auto-detected MIME type,
     or construct directly with ``content_base64`` to skip file I/O.
@@ -25,20 +25,43 @@ class Attachment(BaseModel):
     mime_type: str | None = None
     name: str | None = None
     content_base64: str | None = None
+    max_size_bytes: int | None = None
 
-    MAX_SIZE_BYTES: ClassVar[int] = 5 * 1024 * 1024
+    MAX_SIZE_BYTES: ClassVar[int] = 25 * 1024 * 1024
     ALLOWED_MIME_TYPES: ClassVar[frozenset[str]] = frozenset({
+        # Images
         "image/jpeg",
         "image/png",
         "image/gif",
         "image/webp",
         "image/svg+xml",
+        "image/heic",
+        # Documents
+        "application/pdf",
+        "text/plain",
+        "text/markdown",
+        "text/csv",
+        "application/json",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        # Audio
+        "audio/mpeg",
+        "audio/ogg",
+        "audio/wav",
+        "audio/webm",
+        "audio/mp4",
+        "audio/aac",
+        "audio/x-caf",
+        # Video
+        "video/mp4",
+        "video/webm",
+        "video/quicktime",
     })
 
     def to_gateway(self) -> dict[str, Any]:
         """Serialize this attachment to the gateway ``chat.send`` payload format.
 
-        Validates file size (<= 5 MB) and MIME type (images only).
+        Validates file size and MIME type.
         If ``content_base64`` is set, uses it directly; otherwise reads
         ``file_path`` and base64-encodes its contents.
 
@@ -46,10 +69,13 @@ class Attachment(BaseModel):
             Dict with keys ``type``, ``mimeType``, ``fileName``, ``content``.
 
         Raises:
-            ValueError: If the file exceeds 5 MB or has a disallowed MIME type.
+            ValueError: If the file exceeds the size limit or has a disallowed MIME type.
             FileNotFoundError: If ``file_path`` does not exist and no
                 ``content_base64`` was provided.
         """
+        limit = self.max_size_bytes if self.max_size_bytes is not None else self.MAX_SIZE_BYTES
+        limit_mb = limit / (1024 * 1024)
+
         # Resolve MIME type: explicit > guessed from extension
         resolved_mime = self.mime_type
         if resolved_mime is None:
@@ -73,18 +99,18 @@ class Attachment(BaseModel):
             b64_content = self.content_base64
             # Estimate raw size from base64 length (~4/3 inflation).
             estimated_size = len(b64_content) * 3 // 4
-            if estimated_size > self.MAX_SIZE_BYTES:
+            if estimated_size > limit:
                 raise ValueError(
                     f"content_base64 is approximately {estimated_size} bytes, "
-                    f"exceeding the 5 MB limit ({self.MAX_SIZE_BYTES} bytes)."
+                    f"exceeding the {limit_mb:.0f} MB limit ({limit} bytes)."
                 )
         else:
             path = Path(self.file_path)
             raw = path.read_bytes()
-            if len(raw) > self.MAX_SIZE_BYTES:
+            if len(raw) > limit:
                 raise ValueError(
                     f"File '{self.file_path}' is {len(raw)} bytes, "
-                    f"exceeding the 5 MB limit ({self.MAX_SIZE_BYTES} bytes)."
+                    f"exceeding the {limit_mb:.0f} MB limit ({limit} bytes)."
                 )
             b64_content = base64.b64encode(raw).decode("ascii")
 

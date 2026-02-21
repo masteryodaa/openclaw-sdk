@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import warnings
 from typing import Any
 
 from openclaw_sdk.core.client import OpenClawClient
@@ -300,27 +299,6 @@ class TestPatchAgentConfig:
 
 
 # ------------------------------------------------------------------ #
-# configure_tools deprecation
-# ------------------------------------------------------------------ #
-
-
-class TestConfigureToolsDeprecation:
-    async def test_emits_deprecation_warning(self) -> None:
-        mock = MockGateway()
-        await mock.connect()
-        mock.register("config.setTools", {"ok": True})
-        client = OpenClawClient(config=ClientConfig(), gateway=mock)
-        agent = client.get_agent("test-agent")
-
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            await agent.configure_tools([])
-            assert len(w) == 1
-            assert issubclass(w[0].category, DeprecationWarning)
-            assert "set_tool_policy" in str(w[0].message)
-
-
-# ------------------------------------------------------------------ #
 # create_agent (client)
 # ------------------------------------------------------------------ #
 
@@ -370,26 +348,19 @@ class TestCreateAgentWithToolPolicy:
         assert mcp["remote"]["url"] == "http://example.com/mcp"
         assert mcp["remote"]["transport"] == "streamable-http"
 
-    async def test_without_new_fields_uses_legacy_path(self) -> None:
+    async def test_minimal_agent_creates_empty_config(self) -> None:
         client, mock = await _setup()
-        cfg = AgentConfig(
-            agent_id="legacy-agent",
-            name="Legacy",
-            tools=["shell", "browser"],
-        )
+        cfg = AgentConfig(agent_id="minimal-agent")
 
         agent = await client.create_agent(cfg)
 
-        assert agent.agent_id == "legacy-agent"
+        assert agent.agent_id == "minimal-agent"
         _, params = _last_call(mock, "config.set")
         assert params is not None
         parsed = json.loads(params["raw"])
-        agent_data = parsed["agents"]["legacy-agent"]
-        # Legacy path: tools is a list (from model_dump), not a dict
-        assert isinstance(agent_data["tools"], list)
-        assert "shell" in agent_data["tools"]
-        # agent_id should be stripped from the data
-        assert "agent_id" not in agent_data
+        agent_data = parsed["agents"]["minimal-agent"]
+        # Default system_prompt is not serialized, tools not set → empty
+        assert "tools" not in agent_data
 
     async def test_with_both_tool_policy_and_mcp_servers(self) -> None:
         client, mock = await _setup()

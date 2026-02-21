@@ -39,11 +39,21 @@ class PromptTemplate:
     def render(self, **kwargs: str) -> str:
         """Render the template by substituting variables.
 
+        Only ``{word}`` placeholders are substituted; literal braces in the
+        template (e.g. JSON snippets) are left untouched.
+
         Raises:
             KeyError: If a required variable is not provided and has no default.
         """
         merged = {**self._defaults, **kwargs}
-        return self._template.format(**merged)
+
+        def _replace(match: re.Match[str]) -> str:
+            key = match.group(1)
+            if key not in merged:
+                raise KeyError(key)
+            return merged[key]
+
+        return self._VAR_PATTERN.sub(_replace, self._template)
 
     def partial(self, **kwargs: str) -> PromptTemplate:
         """Return a new template with some variables pre-filled as defaults."""

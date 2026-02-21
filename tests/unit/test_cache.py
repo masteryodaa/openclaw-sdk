@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import asyncio
 
-import pytest
-
 from openclaw_sdk.cache.base import InMemoryCache, ResponseCache
 from openclaw_sdk.callbacks.handler import CallbackHandler
 from openclaw_sdk.core.client import OpenClawClient
@@ -207,7 +205,7 @@ async def test_agent_execute_no_cache_by_default() -> None:
             data={"payload": {"runId": "r1", "content": "hi again"}},
         )
     )
-    result2 = await agent.execute("hello")
+    await agent.execute("hello")
     assert mock.call_count("chat.send") == 2
 
     await client.close()

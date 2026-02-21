@@ -8,7 +8,6 @@ from openclaw_sdk.core.client import OpenClawClient
 from openclaw_sdk.core.config import ClientConfig
 from openclaw_sdk.core.constants import AgentStatus
 from openclaw_sdk.gateway.mock import MockGateway
-from openclaw_sdk.tools.config import ToolConfig, ToolType
 
 
 def _make_connected_gateway() -> MockGateway:
@@ -136,52 +135,6 @@ async def test_get_file_uses_agent_session_key() -> None:
         "files.get",
         {"sessionKey": "agent:mybot:alpha", "path": "/path/x.bin"},
     )
-
-
-async def test_configure_tools_calls_config_set_tools() -> None:
-    mock = _make_connected_gateway()
-    mock.register("config.setTools", {"ok": True})
-    agent = _make_agent(mock)
-
-    tools = [ToolConfig(tool_type=ToolType.SHELL, enabled=True)]
-    await agent.configure_tools(tools)
-
-    mock.assert_called("config.setTools")
-
-
-async def test_configure_tools_passes_session_key() -> None:
-    mock = _make_connected_gateway()
-    mock.register("config.setTools", {"ok": True})
-    agent = _make_agent(mock, "myagent")
-
-    await agent.configure_tools([])
-
-    method, params = mock.calls[-1]
-    assert params["sessionKey"] == "agent:myagent:main"
-
-
-async def test_configure_tools_serialises_tool_list() -> None:
-    mock = _make_connected_gateway()
-    mock.register("config.setTools", {"ok": True})
-    agent = _make_agent(mock)
-
-    tools = [ToolConfig(tool_type=ToolType.BROWSER)]
-    await agent.configure_tools(tools)
-
-    method, params = mock.calls[-1]
-    assert isinstance(params["tools"], list)
-    assert len(params["tools"]) == 1
-    assert params["tools"][0]["tool_type"] == ToolType.BROWSER
-
-
-async def test_configure_tools_returns_gateway_response() -> None:
-    mock = _make_connected_gateway()
-    mock.register("config.setTools", {"status": "applied"})
-    agent = _make_agent(mock)
-
-    result = await agent.configure_tools([])
-
-    assert result == {"status": "applied"}
 
 
 # ------------------------------------------------------------------ #
