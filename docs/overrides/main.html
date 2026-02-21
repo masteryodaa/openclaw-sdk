@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block extrahead %}
+  {{ super() }}
+  <script
+    type="module"
+    src="https://cdn.jsdelivr.net/npm/@inkeep/cxkit-js@0.5/dist/embed.js"
+    defer
+  ></script>
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script type="module">
+    // Inkeep AI Chatbot — replace YOUR_INKEEP_API_KEY with your actual API key
+    // Sign up at https://portal.inkeep.com to get your key
+    const INKEEP_API_KEY = "YOUR_INKEEP_API_KEY";
+
+    if (typeof Inkeep !== "undefined" && INKEEP_API_KEY !== "YOUR_INKEEP_API_KEY") {
+      Inkeep.ChatButton({
+        baseSettings: {
+          apiKey: INKEEP_API_KEY,
+          primaryBrandColor: "#39ff14",
+          organizationDisplayName: "OpenClaw SDK",
+          colorMode: {
+            sync: {
+              target: document.body,
+              attributes: ["data-md-color-scheme"],
+              isDarkMode: (attributes) =>
+                attributes["data-md-color-scheme"] === "slate",
+            },
+          },
+        },
+        modalSettings: {
+          defaultView: "chat",
+        },
+        searchSettings: {},
+        aiChatSettings: {
+          aiAssistantName: "OpenClaw Assistant",
+          aiAssistantAvatar: "🐸",
+          exampleQuestions: [
+            "How do I connect to the OpenClaw gateway?",
+            "How do I create a multi-agent pipeline?",
+            "What guardrails are available?",
+            "How do I use structured output?",
+          ],
+        },
+      });
+    }
+  </script>
+{% endblock %}

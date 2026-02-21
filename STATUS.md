@@ -9,17 +9,17 @@
 
 | Metric | Value |
 |--------|-------|
-| Tests | 806 passing, 12 skipped |
+| Tests | 819 passing |
 | Coverage | 97%+ |
-| mypy | 0 errors (84 files) |
+| mypy | 0 errors (86 files) |
 | ruff | 0 issues |
 | Python | 3.11+ |
-| Version | v0.3.0-dev |
+| Version | v1.0.0 |
 | Exports | 100+ public symbols |
 
 ---
 
-## v0.3.0 — Full Roadmap Features
+## v1.0.0 — Full Roadmap Features
 
 | Feature | Status | Notes |
 |---------|--------|-------|
@@ -37,6 +37,8 @@
 | Jupyter magics | DONE | `%openclaw_connect`, `%openclaw`, `%openclaw_agent` |
 | Celery integration | DONE | `create_execute_task`, `create_batch_task` |
 | MkDocs documentation | DONE | 30+ pages, marketing homepage, custom CSS theme |
+| Built-in MCP Servers | DONE | `docs_server` (search docs), `sdk_server` (gateway operations) via `pip install openclaw-sdk[mcp]` |
+| Inkeep Chatbot | DONE | AI chatbot widget for doc search (requires Inkeep API key) |
 
 ---
 
@@ -91,7 +93,7 @@
 - `client.devices` → DeviceManager
 
 ### Gateways
-- `ProtocolGateway` — WebSocket RPC, auth handshake, reconnect w/ exponential backoff
+- `ProtocolGateway` — WebSocket RPC, Ed25519 device auth, reconnect w/ exponential backoff (E2E verified)
 - `OpenAICompatGateway` — HTTP adapter via httpx
 - `LocalGateway` — auto-connect to local OpenClaw
 - `MockGateway` — in-memory for testing
@@ -114,10 +116,16 @@
 - Celery: `create_execute_task`, `create_batch_task`
 - 10 example scripts
 
+### MCP Servers
+- `docs_server` — search and browse SDK docs from Claude Code/Desktop
+- `sdk_server` — interact with live OpenClaw gateway from Claude Code/Desktop
+- `.mcp.json` project config for Claude Code auto-discovery
+
 ### Quality
 - `py.typed` marker (PEP 561)
-- 806 tests, 97%+ coverage
-- mypy clean (84 files), ruff clean
+- 819 tests, 97%+ coverage
+- E2E verified against live OpenClaw 2026.2.3-1 gateway
+- mypy clean (86 files), ruff clean
 - MkDocs Material documentation site (30+ pages)
 
 ---

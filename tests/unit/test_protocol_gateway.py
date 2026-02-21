@@ -1,6 +1,7 @@
 """Unit tests for ProtocolGateway — no live server required.
 
 All WebSocket I/O is mocked via ``_open_connection`` so these tests run offline.
+The device identity functions are also mocked to avoid dependency on local files.
 """
 from __future__ import annotations
 
@@ -32,8 +33,22 @@ def _challenge(nonce: str = "test-nonce", ts: int = 1000) -> str:
     )
 
 
+def _connect_ok(req_id: str) -> str:
+    """Build a successful connect response."""
+    return json.dumps({
+        "type": "res",
+        "id": req_id,
+        "ok": True,
+        "payload": {
+            "type": "hello-ok",
+            "protocol": 3,
+            "server": {"version": "test", "host": "test"},
+        },
+    })
+
+
 def _result(req_id: str, result: dict[str, Any]) -> str:
-    return json.dumps({"id": req_id, "result": result})
+    return json.dumps({"type": "res", "id": req_id, "ok": True, "payload": result})
 
 
 def _error(req_id: str, code: int, message: str) -> str:
@@ -119,6 +134,55 @@ def _patch_open(ws: Any) -> Any:
     )
 
 
+def _patch_no_device() -> Any:
+    """Patch device identity/auth to return None (no device files)."""
+    return patch.multiple(
+        "openclaw_sdk.gateway.protocol",
+        _load_device_identity=lambda: None,
+        _load_device_auth=lambda: None,
+    )
+
+
+_FAKE_DEVICE = {
+    "version": 1,
+    "deviceId": "deadbeef",
+    "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEANfoKedj4nS7zRIvgFUpZTJGF0LEuGgvRQRhCkJsZ6mg=\n-----END PUBLIC KEY-----\n",
+    "privateKeyPem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIM1Vw97UWQOJQVnSF/upfZPPPgqp8yp5mUknqhnSiajw\n-----END PRIVATE KEY-----\n",
+    "createdAtMs": 1000,
+}
+
+_FAKE_DEVICE_AUTH = {
+    "version": 1,
+    "deviceId": "deadbeef",
+    "tokens": {
+        "operator": {
+            "token": "test-token-123",
+            "role": "operator",
+            "scopes": ["operator.admin"],
+        }
+    },
+}
+
+
+def _patch_device() -> Any:
+    """Patch device identity/auth to return fake device data."""
+    return patch.multiple(
+        "openclaw_sdk.gateway.protocol",
+        _load_device_identity=lambda: _FAKE_DEVICE,
+        _load_device_auth=lambda: _FAKE_DEVICE_AUTH,
+    )
+
+
+def _auto_respond_connect(ws: QueueWebSocket) -> None:
+    """Set up auto-responder that replies to connect method with hello-ok."""
+    async def _respond(data: str) -> None:
+        parsed = json.loads(data)
+        if parsed.get("method") == "connect":
+            ws.put_nowait(_connect_ok(parsed["id"]))
+
+    ws._on_send.append(_respond)
+
+
 # ------------------------------------------------------------------ #
 # Tests: _load_token
 # ------------------------------------------------------------------ #
@@ -150,42 +214,60 @@ def test_load_token_from_json(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) ->
 
 
 # ------------------------------------------------------------------ #
-# Tests: connect + challenge handling
+# Tests: connect + challenge handling (no device = fallback)
 # ------------------------------------------------------------------ #
 
 
 @pytest.mark.asyncio
-async def test_connect_handles_challenge() -> None:
-    """Gateway must complete handshake when connect.challenge is received."""
+async def test_connect_handles_challenge_no_device() -> None:
+    """Without device identity, handshake completes without sending connect."""
     ws = FakeWebSocket([_challenge()])
 
-    with _patch_open(ws):
+    with _patch_open(ws), _patch_no_device():
         gw = ProtocolGateway(ws_url="ws://localhost:18789/gateway", token="tok")
         await gw.connect()
 
     assert gw._connected is True
-    # An auth message must have been sent
-    assert len(ws._sent) == 1
+    # No connect request sent (no device identity)
+    assert len(ws._sent) == 0
+
+    await gw.close()
+
+
+@pytest.mark.asyncio
+async def test_connect_handles_challenge_with_device() -> None:
+    """With device identity, a connect RPC is sent and handshake completes."""
+    ws = QueueWebSocket()
+    ws.put_nowait(_challenge())
+    _auto_respond_connect(ws)
+
+    with _patch_open(ws), _patch_device():
+        gw = ProtocolGateway(ws_url="ws://localhost:18789/gateway", token="tok")
+        await gw.connect()
+
+    assert gw._connected is True
+    # A connect request should have been sent
+    assert len(ws._sent) >= 1
     sent = json.loads(ws._sent[0])
-    assert sent["type"] == "auth"
-    assert sent["token"] == "tok"
-    assert sent["nonce"] == "test-nonce"
+    assert sent["method"] == "connect"
+    assert sent["type"] == "req"
+    assert sent["params"]["device"]["id"] == "deadbeef"
 
     await gw.close()
 
 
 @pytest.mark.asyncio
 async def test_connect_no_token_skips_auth() -> None:
-    """When no token is configured, no auth message is sent."""
+    """When no device identity is available, handshake still completes."""
     ws = FakeWebSocket([_challenge()])
 
-    with _patch_open(ws):
+    with _patch_open(ws), _patch_no_device():
         with patch("openclaw_sdk.gateway.protocol._load_token", return_value=None):
             gw = ProtocolGateway(ws_url="ws://localhost:18789/gateway", token=None)
             await gw.connect()
 
     assert gw._connected is True
-    assert ws._sent == []  # no auth sent
+    assert ws._sent == []  # no connect sent
 
     await gw.close()
 
@@ -195,7 +277,7 @@ async def test_connect_timeout_if_no_challenge() -> None:
     """If no connect.challenge arrives, connect() raises GatewayError."""
     ws = FakeWebSocket([])  # server sends nothing
 
-    with _patch_open(ws):
+    with _patch_open(ws), _patch_no_device():
         gw = ProtocolGateway(
             ws_url="ws://localhost:18789/gateway",
             token="tok",
@@ -218,12 +300,14 @@ async def test_call_returns_result() -> None:
 
     async def _respond(data: str) -> None:
         parsed = json.loads(data)
-        if "method" in parsed:
+        if parsed.get("method") == "connect":
+            ws.put_nowait(_connect_ok(parsed["id"]))
+        elif "method" in parsed:
             ws.put_nowait(_result(parsed["id"], {"sessions": []}))
 
     ws._on_send.append(_respond)
 
-    with _patch_open(ws):
+    with _patch_open(ws), _patch_device():
         gw = ProtocolGateway(ws_url="ws://localhost:18789/gateway", token="tok")
         await gw.connect()
         result = await gw.call("sessions.list", {})
@@ -240,14 +324,16 @@ async def test_call_raises_on_error_response() -> None:
 
     async def _respond(data: str) -> None:
         parsed = json.loads(data)
-        if "method" in parsed:
+        if parsed.get("method") == "connect":
+            ws.put_nowait(_connect_ok(parsed["id"]))
+        elif "method" in parsed:
             ws.put_nowait(
                 _error(parsed["id"], 400, "invalid sessions.list params: bad")
             )
 
     ws._on_send.append(_respond)
 
-    with _patch_open(ws):
+    with _patch_open(ws), _patch_device():
         gw = ProtocolGateway(ws_url="ws://localhost:18789/gateway", token="tok")
         await gw.connect()
         with pytest.raises(GatewayError, match="invalid sessions.list params"):
@@ -272,13 +358,15 @@ async def test_call_passes_idempotency_key() -> None:
 
     async def _respond(data: str) -> None:
         parsed = json.loads(data)
-        if "method" in parsed:
+        if parsed.get("method") == "connect":
+            ws.put_nowait(_connect_ok(parsed["id"]))
+        elif "method" in parsed:
             captured_params.append(parsed.get("params", {}))
             ws.put_nowait(_result(parsed["id"], {"runId": "r1"}))
 
     ws._on_send.append(_respond)
 
-    with _patch_open(ws):
+    with _patch_open(ws), _patch_device():
         gw = ProtocolGateway(ws_url="ws://localhost:18789/gateway", token="tok")
         await gw.connect()
         await gw.call(
@@ -300,12 +388,14 @@ async def test_call_multiple_requests_correlated() -> None:
 
     async def _respond(data: str) -> None:
         parsed = json.loads(data)
-        if "method" in parsed:
+        if parsed.get("method") == "connect":
+            ws.put_nowait(_connect_ok(parsed["id"]))
+        elif "method" in parsed:
             sent_requests.append(parsed)
 
     ws._on_send.append(_respond)
 
-    with _patch_open(ws):
+    with _patch_open(ws), _patch_device():
         gw = ProtocolGateway(ws_url="ws://localhost:18789/gateway", token="tok")
         await gw.connect()
 
@@ -341,10 +431,9 @@ async def test_inflight_requests_fail_on_close() -> None:
     """In-flight calls get GatewayError when close() is called."""
     ws = QueueWebSocket()
     ws.put_nowait(_challenge())
+    _auto_respond_connect(ws)
 
-    # _respond intentionally does nothing — no response ever arrives
-
-    with _patch_open(ws):
+    with _patch_open(ws), _patch_device():
         gw = ProtocolGateway(ws_url="ws://localhost:18789/gateway", token="tok")
         await gw.connect()
 
@@ -367,12 +456,11 @@ async def test_subscribe_receives_push_events() -> None:
     """Push events from the gateway are yielded by subscribe()."""
     ws = QueueWebSocket()
     ws.put_nowait(_challenge())
-    # Note: events are queued AFTER subscribe() registers the subscriber,
-    # so we add them after connect() via a short-delay task.
+    _auto_respond_connect(ws)
 
     received: list[StreamEvent] = []
 
-    with _patch_open(ws):
+    with _patch_open(ws), _patch_device():
         gw = ProtocolGateway(ws_url="ws://localhost:18789/gateway", token="tok")
         await gw.connect()
         stream = await gw.subscribe()
@@ -407,10 +495,11 @@ async def test_subscribe_filters_event_types() -> None:
     """subscribe(event_types=[...]) only yields matching events."""
     ws = QueueWebSocket()
     ws.put_nowait(_challenge())
+    _auto_respond_connect(ws)
 
     received: list[StreamEvent] = []
 
-    with _patch_open(ws):
+    with _patch_open(ws), _patch_device():
         gw = ProtocolGateway(ws_url="ws://localhost:18789/gateway", token="tok")
         await gw.connect()
         stream = await gw.subscribe(event_types=["task.done"])
@@ -451,9 +540,11 @@ async def test_subscribe_raises_when_not_connected() -> None:
 @pytest.mark.asyncio
 async def test_context_manager_connects_and_closes() -> None:
     """async with ProtocolGateway(...) calls connect() and close()."""
-    ws = FakeWebSocket([_challenge()])
+    ws = QueueWebSocket()
+    ws.put_nowait(_challenge())
+    _auto_respond_connect(ws)
 
-    with _patch_open(ws):
+    with _patch_open(ws), _patch_device():
         gw = ProtocolGateway(ws_url="ws://localhost:18789/gateway", token="tok")
         async with gw:
             assert gw._connected is True
@@ -492,12 +583,14 @@ async def test_health_returns_true_on_success() -> None:
 
     async def _respond(data: str) -> None:
         parsed = json.loads(data)
-        if parsed.get("method") == "system-presence":
+        if parsed.get("method") == "connect":
+            ws.put_nowait(_connect_ok(parsed["id"]))
+        elif parsed.get("method") == "system-presence":
             ws.put_nowait(_result(parsed["id"], {"version": "2026.2.3-1"}))
 
     ws._on_send.append(_respond)
 
-    with _patch_open(ws):
+    with _patch_open(ws), _patch_device():
         gw = ProtocolGateway(ws_url="ws://localhost:18789/gateway", token="tok")
         await gw.connect()
         status = await gw.health()
@@ -517,7 +610,9 @@ async def test_health_returns_true_on_success() -> None:
 async def test_connect_retries_on_os_error() -> None:
     """connect() retries with backoff when _open_connection raises OSError."""
     attempt_count = 0
-    ws = FakeWebSocket([_challenge()])
+    ws = QueueWebSocket()
+    ws.put_nowait(_challenge())
+    _auto_respond_connect(ws)
 
     async def _fake_open(url: str, timeout: float) -> Any:
         nonlocal attempt_count
@@ -530,8 +625,9 @@ async def test_connect_retries_on_os_error() -> None:
         with patch(
             "asyncio.sleep", new_callable=AsyncMock
         ):  # skip actual sleeps
-            gw = ProtocolGateway(ws_url="ws://localhost:18789/gateway", token="tok")
-            await gw.connect()
+            with _patch_device():
+                gw = ProtocolGateway(ws_url="ws://localhost:18789/gateway", token="tok")
+                await gw.connect()
 
     assert attempt_count == 3
     assert gw._connected is True
@@ -554,9 +650,11 @@ async def test_close_when_not_connected() -> None:
 @pytest.mark.asyncio
 async def test_double_connect_is_noop() -> None:
     """Calling connect() twice when already connected is a no-op."""
-    ws = FakeWebSocket([_challenge()])
+    ws = QueueWebSocket()
+    ws.put_nowait(_challenge())
+    _auto_respond_connect(ws)
 
-    with _patch_open(ws) as mock_open:
+    with _patch_open(ws) as mock_open, _patch_device():
         gw = ProtocolGateway(ws_url="ws://localhost:18789/gateway", token="tok")
         await gw.connect()
         await gw.connect()  # second call — should be a no-op
@@ -575,9 +673,10 @@ async def test_non_json_message_is_skipped() -> None:
     """Non-JSON messages from the server must not crash the reader."""
     ws = QueueWebSocket()
     ws.put_nowait(_challenge())
+    _auto_respond_connect(ws)
     ws.put_nowait("this is not json!!")
 
-    with _patch_open(ws):
+    with _patch_open(ws), _patch_device():
         gw = ProtocolGateway(ws_url="ws://localhost:18789/gateway", token="tok")
         await gw.connect()
         await asyncio.sleep(0.02)  # let the reader process the bad message

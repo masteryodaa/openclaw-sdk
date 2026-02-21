@@ -7,11 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [1.0.0] — 2026-02-21
 
 ### Added
+- **Built-in MCP Servers** — Two ready-to-use MCP servers: `docs_server` (search/browse SDK docs) and `sdk_server` (interact with live OpenClaw gateway). Install with `pip install "openclaw-sdk[mcp]"`
+- **Inkeep Chatbot** — AI-powered documentation search chatbot (requires Inkeep API key)
 - **Tool Policy** — `ToolPolicy` with preset profiles (`minimal`, `coding`, `messaging`, `full`) and fluent builders (`.deny()`, `.allow_tools()`, `.with_exec()`, `.with_fs()`); maps directly to OpenClaw's native camelCase tool config
-- **MCP Servers** — `McpServer.stdio(cmd, args, env)` and `McpServer.http(url, headers)` for per-agent MCP server configuration
+- **MCP Server Config** — `McpServer.stdio(cmd, args, env)` and `McpServer.http(url, headers)` for per-agent MCP server configuration
 - **Skills Config** — `SkillsConfig` for controlling dynamic tool discovery via ClawHub, skill loading, and per-skill overrides (`SkillEntry`, `SkillLoadConfig`, `SkillInstallConfig`)
 - Agent runtime methods: `set_tool_policy()`, `deny_tools()`, `allow_tools()`, `add_mcp_server()`, `remove_mcp_server()`, `set_skills()`, `configure_skill()`, `enable_skill()`, `disable_skill()`
 - `AgentConfig.to_openclaw_agent()` — native serialization for `create_agent()`
@@ -79,6 +81,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 10 example scripts
 - `docs/quickstart.md`, `docs/protocol.md`
 
-[Unreleased]: https://github.com/openclaw/openclaw-sdk/compare/v0.2.0...HEAD
-[0.2.0]: https://github.com/openclaw/openclaw-sdk/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/openclaw/openclaw-sdk/releases/tag/v0.1.0
+[1.0.0]: https://github.com/openclaw-sdk/openclaw-sdk/compare/v0.2.0...v1.0.0
+[0.2.0]: https://github.com/openclaw-sdk/openclaw-sdk/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/openclaw-sdk/openclaw-sdk/releases/tag/v0.1.0

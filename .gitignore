@@ -27,3 +27,16 @@ htmlcov/
 
 # MkDocs build output
 site/
+
+# Development screenshots
+docs-*.png
+
+# Scratch / temp files
+gen_tests.py
+old_plan.md
+
+# Playwright MCP logs
+.playwright-mcp/
+
+# Internal development plans
+plans/

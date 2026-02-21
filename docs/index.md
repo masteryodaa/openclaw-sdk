@@ -4,56 +4,41 @@ hide:
   - toc
 ---
 
-<!-- Hero Section -->
+<!-- Hero -->
 <div class="oc-hero" markdown>
+
+<span class="oc-mascot">🐸</span>
+
+<div class="oc-badge">v1.0 — Autonomous Agent SDK</div>
+
+# The Last Framework <span class="oc-glow">You'll Ever Need</span>
 
 <div class="oc-tagline">Wrap. Enhance. Ship.</div>
 
-# OpenClaw SDK
-
-<div class="oc-subtitle">
-The official Python SDK for <strong>OpenClaw</strong> — the autonomous AI agent framework with 100k+ stars.
-Build agents that control computers, browse the web, send messages, and learn new skills — all from Python.
+<div class="oc-sub">
+Build AI agents that create their own tools, control computers, browse the web,
+and talk across 10+ messaging channels — all from Python. No chains. No boilerplate. Just vibes.
 </div>
 
-<div class="oc-buttons">
-<a href="getting-started/quickstart/" class="oc-btn oc-btn-primary">
-:material-rocket-launch: Get Started
-</a>
-<a href="https://github.com/openclaw/openclaw-sdk" class="oc-btn oc-btn-secondary">
-:fontawesome-brands-github: View on GitHub
-</a>
+<div class="oc-btns">
+<a href="getting-started/quickstart/" class="oc-btn oc-btn-1">Get Started</a>
+<a href="https://github.com/openclaw-sdk/openclaw-sdk" class="oc-btn oc-btn-2">GitHub</a>
+<a href="api/client/" class="oc-btn oc-btn-3">API Docs &rarr;</a>
+</div>
+
+<div class="oc-pip">
+<code><span class="oc-prompt">$ </span>pip install openclaw-sdk</code>
 </div>
 
 </div>
 
-<!-- Stats -->
-<div class="oc-stats" markdown>
-<div class="oc-stat">
-<div class="oc-stat-value">5</div>
-<div class="oc-stat-label">Lines to First Agent</div>
-</div>
-<div class="oc-stat">
-<div class="oc-stat-value">80+</div>
-<div class="oc-stat-label">Public Exports</div>
-</div>
-<div class="oc-stat">
-<div class="oc-stat-value">98%</div>
-<div class="oc-stat-label">Test Coverage</div>
-</div>
-<div class="oc-stat">
-<div class="oc-stat-value">700+</div>
-<div class="oc-stat-label">Unit Tests</div>
-</div>
-</div>
-
-<!-- Code Showcase -->
-<div class="oc-code-showcase" markdown>
-<div class="oc-code-header">
-<span class="oc-code-dot red"></span>
-<span class="oc-code-dot yellow"></span>
-<span class="oc-code-dot green"></span>
-&nbsp; hello_openclaw.py
+<!-- Terminal -->
+<div class="oc-term" markdown>
+<div class="oc-term-bar">
+<span class="oc-dot r"></span>
+<span class="oc-dot y"></span>
+<span class="oc-dot g"></span>
+<span class="oc-term-title">hello_openclaw.py</span>
 </div>
 
 ```python
@@ -67,8 +52,11 @@ async def main():
             system_prompt="You are a helpful assistant with full OS access.",
         ))
 
-        # The agent figures out HOW to do it — no tool code needed
-        result = await agent.execute("Find today's top tech news and save as a report")
+        # No tools to define. No chains to build.
+        # The agent figures out HOW to do it.
+        result = await agent.execute(
+            "Find today's top tech news and save as a report"
+        )
         print(result.content)
 
         for file in result.files:
@@ -79,58 +67,60 @@ asyncio.run(main())
 
 </div>
 
----
+<!-- Capabilities -->
+<div class="oc-sec oc-center" markdown>
 
-<!-- Core Features -->
-<div class="oc-section-header" markdown>
+<div class="oc-tag">Capabilities</div>
 
-## Why OpenClaw SDK?
+## Agents That Think, Act, and Evolve
 
-Most AI frameworks require you to pre-define every tool, chain, and integration in code.
-OpenClaw is fundamentally different — **agents create their own tools dynamically**.
+<div class="oc-desc">
+Most AI frameworks make you define every tool and chain.
+OpenClaw agents create their own tools, learn new skills, and operate autonomously.
+</div>
 
 </div>
 
-<div class="oc-features" markdown>
+<div class="oc-grid" markdown>
 
-<div class="oc-feature-card" markdown>
-<span class="oc-feature-icon">:material-robot:</span>
+<div class="oc-card" markdown>
+<span class="oc-card-icon">🧠</span>
 
 ### Dynamic Tool Creation
 
-Unlike LangChain, you don't define tools. The agent creates them on the fly — shell, browser, file system, web search, all built-in.
+Agents create tools on the fly — shell, browser, file system, web search, code execution. Describe the goal; they figure out how.
 
 </div>
 
-<div class="oc-feature-card" markdown>
-<span class="oc-feature-icon">:material-pipe:</span>
+<div class="oc-card" markdown>
+<span class="oc-card-icon">🔗</span>
 
 ### Pipelines & Coordination
 
-Chain agents sequentially, run them in parallel, or set up supervisor-worker patterns. Conditional branching, error fallbacks, consensus voting.
+Chain agents sequentially, run in parallel, supervisor-worker patterns. Conditional branching, error fallbacks, consensus voting.
 
 </div>
 
-<div class="oc-feature-card" markdown>
-<span class="oc-feature-icon">:material-chat-processing:</span>
+<div class="oc-card" markdown>
+<span class="oc-card-icon">💬</span>
 
 ### 10+ Messaging Channels
 
-Deploy agents to WhatsApp, Telegram, Discord, Slack, Signal, iMessage, Teams, Matrix — no integration code needed.
+Deploy to WhatsApp, Telegram, Discord, Slack, Signal, iMessage, Teams, Matrix — zero integration code.
 
 </div>
 
-<div class="oc-feature-card" markdown>
-<span class="oc-feature-icon">:material-shield-check:</span>
+<div class="oc-card" markdown>
+<span class="oc-card-icon">🛡️</span>
 
 ### Guardrails & Safety
 
-PII detection, cost limits, content filtering, regex filters. Block dangerous outputs before they reach users.
+PII detection, cost limits, content filtering, regex filters, token limits. Block dangerous outputs before they reach users.
 
 </div>
 
-<div class="oc-feature-card" markdown>
-<span class="oc-feature-icon">:material-code-json:</span>
+<div class="oc-card" markdown>
+<span class="oc-card-icon">📐</span>
 
 ### Structured Output
 
@@ -138,218 +128,330 @@ Parse LLM responses into validated Pydantic models with automatic retry. Full ty
 
 </div>
 
-<div class="oc-feature-card" markdown>
-<span class="oc-feature-icon">:material-chart-line:</span>
+<div class="oc-card" markdown>
+<span class="oc-card-icon">📊</span>
 
-### Cost Tracking & Observability
+### Cost Tracking & Tracing
 
-Monitor token usage and USD costs per agent, per model, per day. Hierarchical tracing with span export. All built-in, free.
+Monitor token usage and USD costs per agent, per model, per day. Hierarchical tracing with span export. Built-in.
 
 </div>
 
-<div class="oc-feature-card" markdown>
-<span class="oc-feature-icon">:material-test-tube:</span>
+<div class="oc-card" markdown>
+<span class="oc-card-icon">🧪</span>
 
 ### Evaluation Framework
 
-Automated agent testing with ContainsEvaluator, ExactMatchEvaluator, RegexEvaluator, LengthEvaluator. Regression-test your prompts.
+Regression-test your prompts with Contains, ExactMatch, Regex, Length evaluators. Automated agent testing as a first-class feature.
 
 </div>
 
-<div class="oc-feature-card" markdown>
-<span class="oc-feature-icon">:material-puzzle:</span>
+<div class="oc-card" markdown>
+<span class="oc-card-icon">🧩</span>
 
-### Skills & ClawHub Marketplace
+### Skills & ClawHub
 
-Browse, install, and manage skills from ClawHub. Agents can even discover and install skills themselves during execution.
-
-</div>
+Browse, install, and manage skills from ClawHub marketplace. Agents discover and install skills during execution.
 
 </div>
 
----
+</div>
 
-<!-- Deployment Platforms -->
-<div class="oc-section-header" markdown>
+<!-- Deploy -->
+<div class="oc-sec oc-center" markdown>
 
-## Deploy Anywhere
+<div class="oc-tag">Deployment</div>
 
-OpenClaw runs anywhere Node.js runs. Each platform gives agents different superpowers.
+## Runs Everywhere
 
 </div>
 
-<div class="oc-platforms" markdown>
+<div class="oc-deploy" markdown>
 
-<div class="oc-platform" markdown>
-<div class="oc-platform-icon">:material-desktop-tower-monitor:</div>
+<div class="oc-dep" markdown>
+<span class="oc-dep-icon">🖥️</span>
 
 #### Desktop
 
-Full OS control — shell, files, browser automation, screenshots.
+<p>Shell, files, browser, screenshots</p>
 
 </div>
 
-<div class="oc-platform" markdown>
-<div class="oc-platform-icon">:material-cellphone:</div>
+<div class="oc-dep" markdown>
+<span class="oc-dep-icon">📱</span>
 
-#### Android (Termux)
+#### Android
 
-SMS, camera, GPS, notifications, contacts, flashlight, voice.
+<p>SMS, camera, GPS, contacts, voice</p>
 
 </div>
 
-<div class="oc-platform" markdown>
-<div class="oc-platform-icon">:material-docker:</div>
+<div class="oc-dep" markdown>
+<span class="oc-dep-icon">🐳</span>
 
 #### Docker
 
-Sandboxed execution, no Node.js install, easy scaling.
+<p>Sandboxed, scalable, no Node.js</p>
 
 </div>
 
-<div class="oc-platform" markdown>
-<div class="oc-platform-icon">:material-raspberry-pi:</div>
+<div class="oc-dep" markdown>
+<span class="oc-dep-icon">🔌</span>
 
-#### Raspberry Pi
+#### IoT / Pi
 
-GPIO pins, home automation, always-on IoT hub.
-
-</div>
+<p>GPIO, home automation, always-on</p>
 
 </div>
 
----
+</div>
 
 <!-- Use Cases -->
-<div class="oc-section-header" markdown>
+<div class="oc-sec oc-center" markdown>
+
+<div class="oc-tag">What You Can Build</div>
 
 ## Endless Possibilities
 
-If you can describe it, an OpenClaw agent can probably do it.
-
-</div>
-
-<div class="oc-usecases" markdown>
-
-<div class="oc-usecase" markdown>
-
-#### :material-robot-happy: Personal AI Assistant
-
-Desktop Jarvis with full OS control. Morning briefings, file management, code generation, task automation.
-
-</div>
-
-<div class="oc-usecase" markdown>
-
-#### :material-store: Agent Builder Platform
-
-Build a SaaS where users create and manage AI agents through a web UI. Competes with Dify — for free.
-
-</div>
-
-<div class="oc-usecase" markdown>
-
-#### :material-headset: Customer Support
-
-Multi-tier support: FAQ bot on cheap model handles 80% of queries, smart model handles complex issues. 12x cost reduction.
-
-</div>
-
-<div class="oc-usecase" markdown>
-
-#### :material-server-network: DevOps Automation
-
-Monitor servers, manage deployments, diagnose issues. Scheduled health checks every 15 minutes via Slack.
-
-</div>
-
-<div class="oc-usecase" markdown>
-
-#### :material-file-document-edit: Research & Content
-
-Automated research, writing, and review pipelines. Researcher agent finds data, writer creates content, editor polishes it.
-
-</div>
-
-<div class="oc-usecase" markdown>
-
-#### :material-domain: Multi-Tenant SaaS
-
-Isolated workspaces per company. Each tenant gets their own agents, quotas, and billing. Built-in tenant management.
-
+<div class="oc-desc">
+If you can describe it, an OpenClaw agent can do it.
 </div>
 
 </div>
 
----
+<div class="oc-mosaic" markdown>
+
+<div class="oc-tile" markdown>
+<span class="oc-tile-tag">Autonomous Assistant</span>
+
+#### Desktop Jarvis
+
+Morning briefings, file management, code generation, task automation, web research, email triage — with full OS access. A personal AGI that lives on your machine.
+
+</div>
+
+<div class="oc-tile" markdown>
+<span class="oc-tile-tag">SaaS Platform</span>
+
+#### Agent Builder
+
+Build a platform where users create and manage AI agents through a web UI. Multi-tenant isolation, quotas, billing — built in.
+
+</div>
+
+<div class="oc-tile" markdown>
+<span class="oc-tile-tag">Support</span>
+
+#### Customer Agents
+
+Multi-tier: cheap model handles 80%, smart model handles the rest. 12x cost reduction.
+
+</div>
+
+<div class="oc-tile" markdown>
+<span class="oc-tile-tag">Ops & Infrastructure</span>
+
+#### DevOps Automation
+
+Monitor servers, manage deployments, diagnose issues, auto-remediate. Scheduled health checks every 15 minutes via Slack, PagerDuty, or any channel.
+
+</div>
+
+<div class="oc-tile" markdown>
+<span class="oc-tile-tag">Content Pipeline</span>
+
+#### Research & Writing
+
+Researcher finds data, writer creates content, editor polishes. Multi-agent pipeline with automatic handoffs.
+
+</div>
+
+<div class="oc-tile" markdown>
+<span class="oc-tile-tag">Enterprise</span>
+
+#### Multi-Tenant SaaS
+
+Isolated workspaces per company. Each tenant gets their own agents, quotas, and audit logs. Full namespace isolation, per-tenant usage reporting, and configurable rate limits.
+
+</div>
+
+</div>
 
 <!-- Comparison -->
-<div class="oc-section-header" markdown>
+<div class="oc-sec oc-center" markdown>
 
-## How We Compare
+<div class="oc-tag">Why OpenClaw</div>
 
-OpenClaw SDK vs the competition — side by side.
-
-</div>
-
-<div class="oc-comparison" markdown>
-
-| Feature | LangChain | CrewAI | Dify | AutoGen | **OpenClaw SDK** |
-|---------|:---------:|:------:|:----:|:-------:|:----------------:|
-| Agent creation | :material-check: | :material-check: | :material-check: | :material-check: | :material-check: |
-| Dynamic tools | :material-close: | :material-close: | :material-close: | :material-close: | :material-check: |
-| OS/Shell control | :material-close: | :material-close: | :material-close: | :material-close: | :material-check: |
-| Browser automation | :material-close: | :material-close: | :material-close: | :material-close: | :material-check: |
-| Self-improving | :material-close: | :material-close: | :material-close: | :material-close: | :material-check: |
-| 10+ Channels | :material-close: | :material-close: | :material-close: | :material-close: | :material-check: |
-| Skills marketplace | :material-close: | :material-close: | :material-check: | :material-close: | :material-check: |
-| Pipelines | :material-check: | :material-check: | :material-check: | :material-check: | :material-check: |
-| Structured output | :material-check: | :material-close: | :material-close: | :material-close: | :material-check: |
-| Cost tracking (free) | :material-close: | :material-close: | :material-check: | :material-check: | :material-check: |
-| Guardrails | :material-close: | :material-close: | :material-close: | :material-close: | :material-check: |
-| Multi-tenancy | :material-close: | :material-close: | :material-close: | :material-close: | :material-check: |
-| Scheduling | :material-close: | :material-close: | :material-close: | :material-close: | :material-check: |
-| Free & open-source | :material-check: | Partial | Partial | :material-check: | :material-check: |
+## Side-by-Side Comparison
 
 </div>
 
-**TL;DR:** LangChain = LEGO bricks (you build everything). OpenClaw SDK = a pre-built robot (it figures things out).
+<div class="oc-comparison">
+<table class="oc-table">
+<thead>
+<tr>
+<th>Feature</th>
+<th>🦜 LangChain</th>
+<th>🤝 CrewAI</th>
+<th>🔮 Dify</th>
+<th>🤖 AutoGen</th>
+<th>🐸 <strong>OpenClaw</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr><td>Agent creation</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td></tr>
+<tr><td>Dynamic tools</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>✅</td></tr>
+<tr><td>OS / Shell control</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>✅</td></tr>
+<tr><td>Browser automation</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>✅</td></tr>
+<tr><td>Self-improving</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>✅</td></tr>
+<tr><td>10+ Channels</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>✅</td></tr>
+<tr><td>Skills marketplace</td><td>❌</td><td>❌</td><td>✅</td><td>❌</td><td>✅</td></tr>
+<tr><td>Pipelines</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td></tr>
+<tr><td>Structured output</td><td>✅</td><td>❌</td><td>❌</td><td>❌</td><td>✅</td></tr>
+<tr><td>Cost tracking</td><td>❌</td><td>❌</td><td>✅</td><td>✅</td><td>✅</td></tr>
+<tr><td>Guardrails</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>✅</td></tr>
+<tr><td>Multi-tenancy</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>✅</td></tr>
+<tr><td>Free &amp; open-source</td><td>✅</td><td>⚠️</td><td>⚠️</td><td>✅</td><td>✅</td></tr>
+</tbody>
+</table>
+</div>
 
----
+<!-- Ecosystem -->
+<div class="oc-sec oc-center" markdown>
 
-<!-- Framework Integrations -->
-<div class="oc-section-header" markdown>
+<div class="oc-tag">Ecosystem</div>
 
-## Works With Your Stack
+## Beyond OpenClaw
 
-Drop-in integrations for the frameworks you already use.
+<div class="oc-desc">
+The *Claw ecosystem is growing. Future SDK versions will support these variants as drop-in gateway backends.
+</div>
 
 </div>
 
-<div class="oc-features" markdown>
+<div class="oc-eco" markdown>
 
-<div class="oc-feature-card" markdown>
-<span class="oc-feature-icon">:simple-fastapi:</span>
+<div class="oc-eco-item" markdown>
+<span class="oc-eco-tag">Core</span>
+
+#### OpenClaw
+
+The original autonomous AI agent framework. Node.js, 50+ modules, 10+ channels.
+
+<span class="oc-eco-badge now">Supported</span>
+
+</div>
+
+<div class="oc-eco-item" markdown>
+<span class="oc-eco-tag">Lightweight</span>
+
+#### NanoClaw
+
+500-line container-based alternative. Security-focused, runs on Anthropic's Agents SDK.
+
+<span class="oc-eco-badge soon">Coming Soon</span>
+
+</div>
+
+<div class="oc-eco-item" markdown>
+<span class="oc-eco-tag">Lightweight</span>
+
+#### Microclaw
+
+Apple container optimized. WhatsApp integration, memory, scheduled jobs, filesystem isolation.
+
+<span class="oc-eco-badge soon">Coming Soon</span>
+
+</div>
+
+<div class="oc-eco-item" markdown>
+<span class="oc-eco-tag">Ultra-Light</span>
+
+#### PicoClaw
+
+Minimal footprint variant. Speed, simplicity, and portability as core principles.
+
+<span class="oc-eco-badge soon">Coming Soon</span>
+
+</div>
+
+<div class="oc-eco-item" markdown>
+<span class="oc-eco-tag">Enterprise</span>
+
+#### IronClaw
+
+Modular framework for teams. Structured autonomy, reusable components, production-grade workflows.
+
+<span class="oc-eco-badge soon">Coming Soon</span>
+
+</div>
+
+<div class="oc-eco-item" markdown>
+<span class="oc-eco-tag">Security</span>
+
+#### TrustClaw
+
+OAuth support, sandboxed execution, secure cloud actions. For security-first deployments.
+
+<span class="oc-eco-badge soon">Coming Soon</span>
+
+</div>
+
+<div class="oc-eco-item" markdown>
+<span class="oc-eco-tag">Performance</span>
+
+#### ZeroClaw
+
+Rust-based implementation. Built for raw speed and minimal resource usage.
+
+<span class="oc-eco-badge soon">Coming Soon</span>
+
+</div>
+
+<div class="oc-eco-item" markdown>
+<span class="oc-eco-tag">Cloud</span>
+
+#### Cloud-Claw
+
+Cloudflare container deployment. One-click deploy, edge computing, global distribution.
+
+<span class="oc-eco-badge soon">Coming Soon</span>
+
+</div>
+
+</div>
+
+<!-- Integrations -->
+<div class="oc-sec oc-center" markdown>
+
+<div class="oc-tag">Integrations</div>
+
+## Drop Into Your Stack
+
+</div>
+
+<div class="oc-grid oc-grid-3" markdown>
+
+<div class="oc-card" markdown>
+<span class="oc-card-icon">⚡</span>
 
 ### FastAPI
 
-Three pre-built routers: agent execution, channel management, admin endpoints. Production-ready.
-
-[:octicons-arrow-right-24: FastAPI guide](guides/fastapi.md)
+Three pre-built routers: agent execution, channel management, admin endpoints.
 
 </div>
 
-<div class="oc-feature-card" markdown>
-<span class="oc-feature-icon">:simple-flask:</span>
+<div class="oc-card" markdown>
+<span class="oc-card-icon">🧪</span>
 
 ### Flask
 
-Blueprint-based integration with agent and channel endpoints. Familiar patterns.
+Blueprint-based integration with agent and channel endpoints.
 
 </div>
 
-<div class="oc-feature-card" markdown>
-<span class="oc-feature-icon">:simple-django:</span>
+<div class="oc-card" markdown>
+<span class="oc-card-icon">🎸</span>
 
 ### Django
 
@@ -357,8 +459,8 @@ URL patterns + views for agent execution. CSRF-exempt API endpoints.
 
 </div>
 
-<div class="oc-feature-card" markdown>
-<span class="oc-feature-icon">:simple-streamlit:</span>
+<div class="oc-card" markdown>
+<span class="oc-card-icon">🎨</span>
 
 ### Streamlit
 
@@ -366,55 +468,45 @@ One-line chat widget: `st_openclaw_chat(agent)`. Thinking display, token trackin
 
 </div>
 
-<div class="oc-feature-card" markdown>
-<span class="oc-feature-icon">:simple-jupyter:</span>
+<div class="oc-card" markdown>
+<span class="oc-card-icon">📓</span>
 
 ### Jupyter
 
-IPython magic commands: `%openclaw ask "Find data"`. Interactive notebook exploration.
+Magic commands: `%openclaw ask "query"`. Interactive notebook exploration.
 
 </div>
 
-<div class="oc-feature-card" markdown>
-<span class="oc-feature-icon">:simple-celery:</span>
+<div class="oc-card" markdown>
+<span class="oc-card-icon">🥬</span>
 
 ### Celery
 
-Queue long-running agent tasks with `execute_agent.delay("bot", "query")`. Background processing.
+Queue long-running agent tasks with `execute_agent.delay()`. Background processing at scale.
 
 </div>
 
 </div>
 
----
+<!-- CTA -->
+<div class="oc-cta" markdown>
 
-<!-- Install CTA -->
-<div class="oc-install" markdown>
+## Build Something Impossible
 
-## Ready to Build?
+<div class="oc-cta-sub">
+Five lines of Python. One autonomous agent. Infinite possibilities.
+</div>
 
-```
-pip install openclaw-sdk
-```
-
-<div style="margin-top: 1.5rem;" markdown>
-<a href="getting-started/installation/" class="oc-btn oc-btn-primary">
-:material-download: Installation Guide
-</a>
-<a href="getting-started/quickstart/" class="oc-btn oc-btn-secondary">
-:material-book-open-variant: Quickstart Tutorial
-</a>
+<div class="oc-btns">
+<a href="getting-started/installation/" class="oc-btn oc-btn-1">Install SDK</a>
+<a href="getting-started/quickstart/" class="oc-btn oc-btn-2">Quickstart</a>
 </div>
 
 </div>
 
----
-
-<div style="text-align: center; padding: 2rem 0; color: var(--oc-text-muted);" markdown>
+<div class="oc-foot" markdown>
 
 **OpenClaw SDK** is MIT-licensed and free forever.
-You only pay for LLM API calls (Claude, GPT, Gemini) — or use free local models via Ollama.
-
-Built with :material-heart: by the OpenClaw community
+You only pay for LLM API calls — or use free local models via Ollama.
 
 </div>

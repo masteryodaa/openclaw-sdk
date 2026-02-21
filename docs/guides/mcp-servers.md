@@ -4,9 +4,101 @@ The Model Context Protocol (MCP) lets you extend an agent's capabilities by conn
 external tool servers. An MCP server exposes tools, resources, and prompts that the agent
 can discover and invoke at runtime — without modifying the agent's core configuration.
 
-## Transports
+## Built-in MCP Servers
 
-OpenClaw supports two MCP transport types.
+The SDK ships with two MCP servers that you can use directly with Claude Code,
+Claude Desktop, or any MCP-compatible client.
+
+### Docs Server
+
+Search and browse the OpenClaw SDK documentation from within Claude.
+
+```bash
+# Install with MCP extras
+pip install "openclaw-sdk[mcp]"
+
+# Add to Claude Code
+claude mcp add openclaw-docs -- python -m openclaw_sdk.mcp.docs_server
+```
+
+**Tools provided:**
+
+| Tool | Description |
+|------|-------------|
+| `search_docs(query)` | Full-text search across all documentation pages |
+| `read_doc(path)` | Read a specific doc page by path |
+| `list_doc_pages()` | List all available pages with titles |
+| `reload_docs()` | Reload docs from disk after changes |
+
+**Claude Desktop configuration:**
+
+```json
+{
+  "mcpServers": {
+    "openclaw-docs": {
+      "command": "python",
+      "args": ["-m", "openclaw_sdk.mcp.docs_server"]
+    }
+  }
+}
+```
+
+### SDK Server
+
+Interact with a live OpenClaw gateway directly from Claude.
+
+```bash
+# Add to Claude Code
+claude mcp add openclaw-sdk -- python -m openclaw_sdk.mcp.sdk_server
+
+# With custom gateway URL
+claude mcp add --env OPENCLAW_URL=ws://10.0.0.42:18789 openclaw-sdk -- python -m openclaw_sdk.mcp.sdk_server
+```
+
+**Tools provided:**
+
+| Tool | Description |
+|------|-------------|
+| `execute_agent(agent_id, query)` | Execute an agent with a query |
+| `list_sessions()` | List active gateway sessions |
+| `get_session(key)` | Get session details |
+| `get_config()` | Read gateway configuration |
+| `gateway_health()` | Check gateway health |
+| `inject_message(key, msg)` | Inject context into a session |
+| `abort_agent(key)` | Abort a running agent |
+| `tail_logs()` | Get recent gateway logs |
+
+**Environment variables:**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OPENCLAW_URL` | `ws://127.0.0.1:18789` | Gateway WebSocket URL |
+| `OPENCLAW_TOKEN` | (empty) | Auth token for the gateway |
+| `OPENCLAW_DEVICE_ID` | `mcp-server` | Device ID for auth handshake |
+
+**Claude Desktop configuration:**
+
+```json
+{
+  "mcpServers": {
+    "openclaw-sdk": {
+      "command": "python",
+      "args": ["-m", "openclaw_sdk.mcp.sdk_server"],
+      "env": {
+        "OPENCLAW_URL": "ws://127.0.0.1:18789"
+      }
+    }
+  }
+}
+```
+
+---
+
+## Attaching MCP Servers to Agents
+
+### Transports
+
+OpenClaw supports two MCP transport types for attaching servers to agents.
 
 | Transport | Use Case | Connection |
 |-----------|----------|------------|

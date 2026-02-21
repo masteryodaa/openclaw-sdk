@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
 import os
+import platform
 import random
 import time
 from pathlib import Path
@@ -23,6 +25,14 @@ logger = logging.getLogger(__name__)
 _BACKOFF_INITIAL = 1.0  # seconds
 _BACKOFF_MAX = 30.0     # seconds
 _BACKOFF_JITTER = 0.5   # ± jitter fraction
+
+# SDK version for connect handshake
+_SDK_VERSION = "1.0.0"
+
+
+def _base64url_encode(data: bytes) -> str:
+    """RFC 4648 base64url encoding without padding."""
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
 
 
 def _load_token() -> str | None:
@@ -56,6 +66,84 @@ def _load_token() -> str | None:
         "Some methods may fail."
     )
     return None
+
+
+def _load_device_identity() -> dict[str, Any] | None:
+    """Load device identity from ~/.openclaw/identity/device.json."""
+    path = Path.home() / ".openclaw" / "identity" / "device.json"
+    if not path.exists():
+        logger.debug("No device identity at %s", path)
+        return None
+    try:
+        with path.open() as fh:
+            data: dict[str, Any] = json.load(fh)
+            return data
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Failed to read device.json: %s", exc)
+        return None
+
+
+def _load_device_auth() -> dict[str, Any] | None:
+    """Load device auth tokens from ~/.openclaw/identity/device-auth.json."""
+    path = Path.home() / ".openclaw" / "identity" / "device-auth.json"
+    if not path.exists():
+        logger.debug("No device auth at %s", path)
+        return None
+    try:
+        with path.open() as fh:
+            data: dict[str, Any] = json.load(fh)
+            return data
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Failed to read device-auth.json: %s", exc)
+        return None
+
+
+def _sign_device_payload(private_key_pem: str, payload: str) -> str:
+    """Sign a UTF-8 payload with Ed25519 and return base64url signature.
+
+    Uses the ``cryptography`` library if available, falls back to
+    ``PyNaCl`` (``nacl``), or raises if neither is installed.
+    """
+    payload_bytes = payload.encode("utf-8")
+
+    # Try cryptography first (most common)
+    try:
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+        from cryptography.hazmat.primitives.serialization import load_pem_private_key
+
+        key = load_pem_private_key(private_key_pem.encode(), password=None)
+        assert isinstance(key, Ed25519PrivateKey)
+        sig = key.sign(payload_bytes)
+        return _base64url_encode(sig)
+    except ImportError:
+        pass
+
+    raise GatewayError(
+        "Ed25519 signing requires 'cryptography'. "
+        "Install with: pip install cryptography"
+    )
+
+
+def _extract_raw_public_key(public_key_pem: str) -> str:
+    """Extract the raw 32-byte Ed25519 public key from PEM and return base64url."""
+    try:
+        from cryptography.hazmat.primitives.serialization import (
+            Encoding,
+            PublicFormat,
+            load_pem_public_key,
+        )
+
+        pub = load_pem_public_key(public_key_pem.encode())
+        raw = pub.public_bytes(Encoding.Raw, PublicFormat.Raw)
+        return _base64url_encode(raw)
+    except ImportError:
+        # Fallback: parse SPKI DER manually — last 32 bytes of the DER
+        pem_body = public_key_pem.replace("-----BEGIN PUBLIC KEY-----", "")
+        pem_body = pem_body.replace("-----END PUBLIC KEY-----", "")
+        der = base64.b64decode(pem_body.strip())
+        # Ed25519 SPKI is exactly 44 bytes: 12-byte header + 32-byte key
+        raw = der[-32:]
+        return _base64url_encode(raw)
 
 
 async def _open_connection(ws_url: str, timeout: float) -> ClientConnection:
@@ -114,6 +202,8 @@ class ProtocolGateway(Gateway):
 
         # Set after the connect.challenge handshake completes
         self._handshake_done: asyncio.Event = asyncio.Event()
+        # Track the connect request id so we can set _handshake_done on response
+        self._connect_req_id: str | None = None
 
     # ------------------------------------------------------------------ #
     # Internal helpers
@@ -124,11 +214,12 @@ class ProtocolGateway(Gateway):
         return f"req_{self._req_counter}"
 
     async def _do_connect(self) -> None:
-        """Open the WebSocket, start the reader, wait for connect.challenge."""
+        """Open the WebSocket, start the reader, complete the connect handshake."""
         if self._token is None:
             self._token = _load_token()
 
         self._handshake_done.clear()
+        self._connect_req_id = None
 
         self._ws = await _open_connection(self._ws_url, self._connect_timeout)
 
@@ -138,7 +229,10 @@ class ProtocolGateway(Gateway):
             self._reader_loop(), name="openclaw-ws-reader"
         )
 
-        # Wait for the handshake to complete (challenge received + auth sent).
+        # Wait for the connect handshake to complete.
+        # Flow: reader receives connect.challenge → _handle_challenge sends
+        # connect RPC → reader receives response → _route_message sets
+        # _handshake_done.
         try:
             await asyncio.wait_for(
                 self._handshake_done.wait(), timeout=self._connect_timeout
@@ -146,7 +240,7 @@ class ProtocolGateway(Gateway):
         except asyncio.TimeoutError as exc:
             await self._cleanup_ws()
             raise GatewayError(
-                "Timed out waiting for connect.challenge from gateway"
+                "Timed out waiting for connect handshake with gateway"
             ) from exc
 
         self._connected = True
@@ -157,22 +251,108 @@ class ProtocolGateway(Gateway):
         await self._ws.send(json.dumps(payload))
 
     async def _handle_challenge(self, payload: dict[str, Any]) -> None:
-        """Respond to connect.challenge with the auth token."""
+        """Respond to connect.challenge with a ``connect`` RPC.
+
+        The gateway expects a full ``connect`` method call with device identity
+        and Ed25519 cryptographic signature, not a simple auth token message.
+
+        Signing payload format (v2, with nonce)::
+
+            v2|deviceId|clientId|clientMode|role|scopes|signedAtMs|token|nonce
+
+        This method sends the connect request and returns immediately.
+        The handshake completes when ``_route_message`` processes the
+        connect response and sets ``_handshake_done``.
+        """
         nonce = payload.get("nonce", "")
         logger.debug("Received connect.challenge nonce=%s", nonce)
-        if self._token:
-            await self._send_json(
-                {
-                    "type": "auth",
-                    "token": self._token,
-                    "nonce": nonce,
-                }
-            )
-        else:
+
+        # Load device identity and auth
+        device = _load_device_identity()
+        device_auth = _load_device_auth()
+
+        if not device or not device_auth:
             logger.warning(
-                "No auth token available; skipping auth response to challenge"
+                "No device identity/auth found; skipping connect handshake. "
+                "Run 'openclaw login' to set up device identity."
             )
-        self._handshake_done.set()
+            self._handshake_done.set()
+            return
+
+        device_id: str = device["deviceId"]
+        private_key_pem: str = device["privateKeyPem"]
+        public_key_pem: str = device["publicKeyPem"]
+
+        # Get operator token and scopes
+        op_token_data = device_auth.get("tokens", {}).get("operator", {})
+        auth_token: str = op_token_data.get("token", "")
+        role: str = op_token_data.get("role", "operator")
+        scopes: list[str] = op_token_data.get("scopes", [])
+
+        # Build the signing payload
+        signed_at_ms = int(time.time() * 1000)
+        scopes_str = ",".join(scopes)
+        sign_payload = "|".join([
+            "v2",
+            device_id,
+            "cli",          # client.id (constant)
+            "cli",          # client.mode (constant)
+            role,
+            scopes_str,
+            str(signed_at_ms),
+            auth_token,
+            nonce,
+        ])
+
+        # Sign with Ed25519
+        signature = _sign_device_payload(private_key_pem, sign_payload)
+        public_key_b64url = _extract_raw_public_key(public_key_pem)
+
+        # Build the connect request
+        plat = platform.system().lower()
+        connect_params: dict[str, Any] = {
+            "minProtocol": 3,
+            "maxProtocol": 3,
+            "client": {
+                "id": "cli",
+                "version": _SDK_VERSION,
+                "platform": plat,
+                "mode": "cli",
+            },
+            "role": role,
+            "scopes": scopes,
+            "caps": [],
+            "commands": [],
+            "permissions": {},
+            "auth": {"token": auth_token},
+            "locale": "en-US",
+            "userAgent": f"openclaw-sdk/{_SDK_VERSION}",
+            "device": {
+                "id": device_id,
+                "publicKey": public_key_b64url,
+                "signature": signature,
+                "signedAt": signed_at_ms,
+                "nonce": nonce,
+            },
+        }
+
+        # Send as a normal RPC request — the response will be handled by
+        # _route_message which checks _connect_req_id to set _handshake_done.
+        req_id = self._next_id()
+        self._connect_req_id = req_id
+
+        loop = asyncio.get_event_loop()
+        future: asyncio.Future[dict[str, Any]] = loop.create_future()
+        self._pending[req_id] = future
+
+        await self._send_json({
+            "type": "req",
+            "id": req_id,
+            "method": "connect",
+            "params": connect_params,
+        })
+        # Do NOT await future here — that would deadlock the reader loop.
+        # _route_message will resolve the future AND set _handshake_done.
 
     def _dispatch_event(self, event_name: str, payload: dict[str, Any]) -> None:
         """Route a push event to all matching subscriber queues."""
@@ -231,9 +411,12 @@ class ProtocolGateway(Gateway):
             return
 
         # RPC response (has id field)
+        # Gateway uses type="res" with ok/payload/error fields
         msg_id = msg.get("id")
         if msg_id and isinstance(msg_id, str) and msg_id in self._pending:
             future = self._pending.pop(msg_id)
+            is_connect = msg_id == self._connect_req_id
+
             if "error" in msg:
                 err = msg["error"]
                 exc = GatewayError(
@@ -242,15 +425,35 @@ class ProtocolGateway(Gateway):
                 )
                 if not future.done():
                     future.set_exception(exc)
-            elif "result" in msg:
+                if is_connect:
+                    logger.error("Gateway connect failed: %s", exc)
+                    self._handshake_done.set()
+            elif "result" in msg or "payload" in msg:
                 if not future.done():
-                    result: dict[str, Any] = msg["result"] or {}
+                    # Gateway may use "result" or "payload" for the response body
+                    raw_result = msg.get("result") or msg.get("payload") or {}
+                    # Normalize: if payload is a list, wrap it for dict return type
+                    result: dict[str, Any] = (
+                        raw_result if isinstance(raw_result, dict) else {"data": raw_result}
+                    )
                     future.set_result(result)
+                if is_connect:
+                    logger.info("Gateway connect handshake completed")
+                    self._handshake_done.set()
+            elif msg.get("ok") is True:
+                # Some responses have ok=true with no payload
+                if not future.done():
+                    future.set_result({})
+                if is_connect:
+                    logger.info("Gateway connect handshake completed")
+                    self._handshake_done.set()
             else:
                 if not future.done():
                     future.set_exception(
                         GatewayError(f"Malformed response (no result/error): {msg}")
                     )
+                if is_connect:
+                    self._handshake_done.set()
             return
 
         logger.debug("Unrouted message: %s", msg)
@@ -343,10 +546,14 @@ class ProtocolGateway(Gateway):
         try:
             result = await self.call("system-presence", {})
             latency_ms = (time.monotonic() - t0) * 1000.0
+            # system-presence may return a list or dict; normalize to dict.
+            details: dict[str, Any] = (
+                result if isinstance(result, dict) else {"nodes": result}
+            )
             return HealthStatus(
                 healthy=True,
                 latency_ms=latency_ms,
-                details=result,
+                details=details,
             )
         except GatewayError as exc:
             return HealthStatus(healthy=False, details={"error": str(exc)})
@@ -378,6 +585,7 @@ class ProtocolGateway(Gateway):
 
         req_id = self._next_id()
         envelope: dict[str, Any] = {
+            "type": "req",
             "id": req_id,
             "method": method,
             "params": dict(params) if params is not None else {},

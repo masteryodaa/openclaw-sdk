@@ -158,4 +158,4 @@ print(openclaw_sdk.__openclaw_compat__)
 
 - [Agents & Execution](../guides/agents.md) — using agents
 - [Tool Policy](../guides/tool-policy.md) — controlling agent tools
-- [FastAPI Integration](../guides/fastapi.md) — web API setup
+- [Framework Integrations](../guides/integrations.md) — FastAPI, Flask, Django, and more

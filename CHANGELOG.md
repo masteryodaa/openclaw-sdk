@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — Gateway Protocol (E2E Verified)
+- **Auth handshake** — rewrote `ProtocolGateway._handle_challenge()` to use proper `connect` method RPC with Ed25519 device identity signatures (v2 payload format)
+- **Request format** — all RPC calls now include `"type": "req"` field (gateway rejects without it)
+- **Response parsing** — handle gateway `payload` field (not `result`) and list responses
+- **Event handling** — `_execute_impl` now handles real gateway event types (`agent`/`chat` with `state: delta/final`) alongside MockGateway events for backward compatibility
+- **idempotencyKey** — now auto-generated (uuid4) for every `chat.send` call (gateway requires it)
+- **CronJob model** — `schedule` and `payload` fields accept both `str` and `dict` (gateway returns objects)
+- **EventType enum** — added real gateway event types: `AGENT`, `CHAT`, `PRESENCE`, `HEALTH`, `TICK`, `HEARTBEAT`, `CRON`, `SHUTDOWN`
+
 ### Added — v0.3.0 Roadmap Features
 - **Agent Templates** — 8 pre-built templates (`assistant`, `customer-support`, `data-analyst`, `code-reviewer`, `researcher`, `writer`, `devops`, `mobile-jarvis`); `get_template()`, `list_templates()`, `client.create_agent_from_template()`
 - **Conditional Pipelines** — `ConditionalPipeline` with `add_branch()`, `add_parallel()`, `add_fallback()` for branching, concurrent, and fault-tolerant agent workflows

@@ -30,9 +30,9 @@ class CronJob(BaseModel):
 
     id: str | None = None
     name: str
-    schedule: str
+    schedule: str | dict[str, Any]  # cron expression or schedule object
     session_target: str = Field(alias="sessionTarget", default="")
-    payload: str = ""
+    payload: str | dict[str, Any] = ""  # message string or payload object
     enabled: bool = True
     last_run: int | None = Field(default=None, alias="lastRun")
     next_run: int | None = Field(default=None, alias="nextRun")

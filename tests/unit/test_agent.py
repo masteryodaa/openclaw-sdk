@@ -127,7 +127,12 @@ async def test_execute_sends_correct_session_key() -> None:
     agent = client.get_agent("bot", session_name="alpha")
     await agent.execute("hi")
 
-    mock.assert_called_with("chat.send", {"sessionKey": "agent:bot:alpha", "message": "hi"})
+    mock.assert_called("chat.send")
+    # Verify session key and message (idempotencyKey is auto-generated)
+    call_params = next(p for m, p in mock.calls if m == "chat.send")
+    assert call_params["sessionKey"] == "agent:bot:alpha"
+    assert call_params["message"] == "hi"
+    assert "idempotencyKey" in call_params
     await client.close()
 
 

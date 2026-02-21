@@ -4,7 +4,7 @@ Drop-in integrations for Django, Flask, Streamlit, Jupyter, and Celery.
 
 ## FastAPI
 
-See the dedicated [FastAPI Integration](fastapi.md) guide for full details.
+The OpenClaw SDK provides optional FastAPI router factories for REST APIs.
 
 ```python
 from openclaw_sdk.integrations.fastapi import create_agent_router

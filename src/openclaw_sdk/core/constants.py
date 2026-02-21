@@ -20,6 +20,7 @@ class AgentStatus(StrEnum):
 
 
 class EventType(StrEnum):
+    # SDK-level event types (used in MockGateway and tests)
     THINKING = "thinking"
     TOOL_CALL = "tool_call"
     TOOL_RESULT = "tool_result"
@@ -27,6 +28,16 @@ class EventType(StrEnum):
     CONTENT = "content"
     ERROR = "error"
     DONE = "done"
+
+    # Real gateway event types (from live OpenClaw protocol)
+    AGENT = "agent"
+    CHAT = "chat"
+    PRESENCE = "presence"
+    HEALTH = "health"
+    TICK = "tick"
+    HEARTBEAT = "heartbeat"
+    CRON = "cron"
+    SHUTDOWN = "shutdown"
 
 
 class ChannelType(StrEnum):

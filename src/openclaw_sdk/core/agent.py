@@ -4,6 +4,7 @@ import asyncio
 import base64
 import json
 import time
+import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, AsyncIterator, Type, TypeVar
 
@@ -107,9 +108,8 @@ class Agent:
         params: dict[str, Any] = {
             "sessionKey": self.session_key,
             "message": query,
+            "idempotencyKey": idempotency_key or uuid.uuid4().hex,
         }
-        if idempotency_key is not None:
-            params["idempotencyKey"] = idempotency_key
 
         if options and options.attachments:
             gateway_attachments: list[dict[str, Any]] = []
@@ -217,7 +217,9 @@ class Agent:
         """
         params = self._build_send_params(query, options, idempotency_key)
 
-        subscriber = await self._client.gateway.subscribe()
+        _EXEC_EVENTS = ["agent", "chat", "content", "done", "error", "thinking",
+                        "tool_call", "tool_result", "file_generated"]
+        subscriber = await self._client.gateway.subscribe(event_types=_EXEC_EVENTS)
         await self._client.gateway.call("chat.send", params)
 
         return self._yield_events(subscriber)
@@ -228,8 +230,13 @@ class Agent:
     ) -> AsyncIterator[StreamEvent]:
         async for event in subscriber:
             yield event
+            # Break on terminal events (both mock and real gateway)
             if event.event_type in (EventType.DONE, EventType.ERROR):
                 break
+            if event.event_type == EventType.CHAT:
+                payload = event.data.get("payload") or {}
+                if payload.get("state") in ("final", "error", "aborted"):
+                    break
 
     async def batch(
         self,
@@ -549,9 +556,12 @@ class Agent:
     ) -> ExecutionResult:
         """Core execution — handles both WS and HTTP-only gateways."""
         # Try to subscribe before sending so we don't miss events.
+        # Filter for agent/chat events + SDK-level events (for MockGateway compat).
+        _EXEC_EVENTS = ["agent", "chat", "content", "done", "error", "thinking",
+                        "tool_call", "tool_result", "file_generated"]
         try:
             subscriber: AsyncIterator[StreamEvent] | None = (
-                await self._client.gateway.subscribe()
+                await self._client.gateway.subscribe(event_types=_EXEC_EVENTS)
             )
             has_stream = True
         except NotImplementedError:
@@ -598,7 +608,147 @@ class Agent:
                     if run_id and event_run_id and event_run_id != run_id:
                         continue
 
-                    if event.event_type == EventType.CONTENT:
+                    # ---- Real gateway events: "chat" and "agent" ----
+
+                    if event.event_type == EventType.CHAT:
+                        state = payload.get("state", "")
+                        msg = payload.get("message") or {}
+                        raw_content = msg.get("content") or ""
+
+                        if state == "delta":
+                            text, blocks, thinking = _parse_content(raw_content)
+                            if text:
+                                content_parts.append(text)
+                            content_blocks.extend(blocks)
+                            thinking_parts.extend(thinking)
+                            await cb.on_stream_event(self.agent_id, event)
+
+                        elif state == "final":
+                            # Final message — extract full content
+                            text, blocks, thinking = _parse_content(raw_content)
+                            # Replace accumulated deltas with the final text
+                            content_parts.clear()
+                            if text:
+                                content_parts.append(text)
+                            if blocks:
+                                content_blocks = blocks
+                            thinking_parts.extend(thinking)
+
+                            # Token usage from message metadata
+                            usage_data = (
+                                msg.get("usage")
+                                or msg.get("tokenUsage")
+                                or payload.get("usage")
+                                or {}
+                            )
+                            if usage_data:
+                                token_usage = TokenUsage.from_gateway(usage_data)
+
+                            stop_reason = (
+                                msg.get("stopReason")
+                                or payload.get("stopReason")
+                                or "complete"
+                            )
+                            await cb.on_stream_event(self.agent_id, event)
+                            break
+
+                        elif state == "error":
+                            error_msg = (
+                                msg.get("error")
+                                or payload.get("error")
+                                or "Agent reported an error"
+                            )
+                            raise AgentExecutionError(
+                                f"Agent '{self.agent_id}': {error_msg}"
+                            )
+
+                        elif state == "aborted":
+                            stop_reason = "aborted"
+                            success = False
+                            break
+
+                    elif event.event_type == EventType.AGENT:
+                        stream = payload.get("stream", "")
+                        data = payload.get("data") or {}
+
+                        if stream == "assistant":
+                            # Streaming text delta from agent
+                            delta = data.get("delta") or data.get("text") or ""
+                            if delta:
+                                content_parts.append(delta)
+                            await cb.on_stream_event(self.agent_id, event)
+
+                        elif stream == "thinking":
+                            thinking_chunk = data.get("text") or data.get("delta") or ""
+                            if thinking_chunk:
+                                thinking_parts.append(thinking_chunk)
+                            await cb.on_stream_event(self.agent_id, event)
+
+                        elif stream == "tool":
+                            phase = data.get("phase", "")
+                            if phase == "call":
+                                tool_name = data.get("tool") or data.get("name") or ""
+                                tool_input = data.get("input") or ""
+                                if isinstance(tool_input, dict):
+                                    tool_input = json.dumps(tool_input)
+                                _pending_tool = {
+                                    "tool": tool_name,
+                                    "input": tool_input,
+                                    "t0": time.monotonic(),
+                                }
+                                await cb.on_tool_call(self.agent_id, tool_name, tool_input)
+                            elif phase == "result":
+                                tool_output = data.get("output") or data.get("result") or ""
+                                if isinstance(tool_output, dict):
+                                    tool_output = json.dumps(tool_output)
+                                if _pending_tool is not None:
+                                    duration = int(
+                                        (time.monotonic() - _pending_tool["t0"]) * 1000
+                                    )
+                                    tool_calls.append(
+                                        ToolCall(
+                                            tool=_pending_tool["tool"],
+                                            input=_pending_tool["input"],
+                                            output=tool_output,
+                                            duration_ms=duration,
+                                        )
+                                    )
+                                    await cb.on_tool_result(
+                                        self.agent_id,
+                                        _pending_tool["tool"],
+                                        tool_output,
+                                        duration,
+                                    )
+                                    _pending_tool = None
+                            await cb.on_stream_event(self.agent_id, event)
+
+                        elif stream == "file":
+                            gf = GeneratedFile(
+                                name=data.get("name") or data.get("fileName") or "",
+                                path=data.get("path") or "",
+                                size_bytes=data.get("sizeBytes") or data.get("size") or 0,
+                                mime_type=(
+                                    data.get("mimeType")
+                                    or data.get("mime_type")
+                                    or "application/octet-stream"
+                                ),
+                            )
+                            files.append(gf)
+                            await cb.on_file_generated(self.agent_id, gf)
+                            await cb.on_stream_event(self.agent_id, event)
+
+                        elif stream == "lifecycle":
+                            phase = data.get("phase", "")
+                            if phase == "error":
+                                error_msg = data.get("error") or "Agent execution error"
+                                raise AgentExecutionError(
+                                    f"Agent '{self.agent_id}': {error_msg}"
+                                )
+                            # phase == "end" is handled by the "chat" final event
+
+                    # ---- Mock / SDK-level event types (backward compat) ----
+
+                    elif event.event_type == EventType.CONTENT:
                         raw_content = payload.get("content") or payload.get("text") or ""
                         text, blocks, thinking = _parse_content(raw_content)
                         if text:
@@ -676,7 +826,6 @@ class Agent:
                             content_parts.append(text)
                         content_blocks.extend(blocks)
                         thinking_parts.extend(thinking)
-                        # Extract token usage from DONE payload.
                         usage_data = (
                             payload.get("usage")
                             or payload.get("tokenUsage")

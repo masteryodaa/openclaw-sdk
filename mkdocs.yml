@@ -1,8 +1,8 @@
 site_name: OpenClaw SDK
 site_description: The official Python SDK for the OpenClaw autonomous AI agent framework
 site_url: https://openclaw.github.io/openclaw-sdk/
-repo_url: https://github.com/openclaw/openclaw-sdk
-repo_name: openclaw/openclaw-sdk
+repo_url: https://github.com/openclaw-sdk/openclaw-sdk
+repo_name: openclaw-sdk/openclaw-sdk
 edit_uri: edit/main/docs/
 
 theme:
@@ -11,21 +11,22 @@ theme:
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: deep purple
-      accent: amber
+      primary: green
+      accent: lime
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: deep purple
-      accent: amber
+      primary: green
+      accent: lime
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
   font:
     text: Inter
     code: JetBrains Mono
+  favicon: assets/favicon.svg
   icon:
     repo: fontawesome/brands/github
     logo: material/robot
@@ -137,7 +138,7 @@ nav:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/openclaw/openclaw-sdk
+      link: https://github.com/openclaw-sdk/openclaw-sdk
   generator: false
 
 copyright: Copyright &copy; 2026 OpenClaw Contributors
