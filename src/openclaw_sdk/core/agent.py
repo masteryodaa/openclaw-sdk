@@ -14,7 +14,14 @@ from openclaw_sdk.core.config import ExecutionOptions
 from openclaw_sdk.core.constants import AgentStatus, EventType
 from openclaw_sdk.core.exceptions import AgentExecutionError, OpenClawError
 from openclaw_sdk.core.exceptions import TimeoutError as OcTimeoutError
-from openclaw_sdk.core.types import Attachment, ExecutionResult, StreamEvent
+from openclaw_sdk.core.types import (
+    Attachment,
+    ExecutionResult,
+    GeneratedFile,
+    StreamEvent,
+    TokenUsage,
+    ToolCall,
+)
 
 if TYPE_CHECKING:
     from openclaw_sdk.core.client import OpenClawClient
@@ -542,9 +549,18 @@ class Agent:
                 latency_ms=int((time.monotonic() - t0) * 1000),
             )
 
-        # WebSocket path: collect events until DONE / ERROR.
+        # WebSocket path: collect events until DONE / ERROR / aborted.
         run_id: str = send_result.get("runId", "")
         content_parts: list[str] = []
+        thinking_parts: list[str] = []
+        tool_calls: list[ToolCall] = []
+        files: list[GeneratedFile] = []
+        token_usage = TokenUsage()
+        stop_reason: str | None = None
+        success = True
+
+        # Track pending tool call for pairing TOOL_CALL → TOOL_RESULT.
+        _pending_tool: dict[str, Any] | None = None
 
         try:
             async with asyncio.timeout(timeout):
@@ -561,10 +577,86 @@ class Agent:
                         content_parts.append(chunk)
                         await cb.on_stream_event(self.agent_id, event)
 
+                    elif event.event_type == EventType.THINKING:
+                        thinking_chunk = (
+                            payload.get("thinking")
+                            or payload.get("content")
+                            or ""
+                        )
+                        thinking_parts.append(thinking_chunk)
+                        await cb.on_stream_event(self.agent_id, event)
+
+                    elif event.event_type == EventType.TOOL_CALL:
+                        tool_name = payload.get("tool") or payload.get("name") or ""
+                        tool_input = payload.get("input") or ""
+                        if isinstance(tool_input, dict):
+                            tool_input = json.dumps(tool_input)
+                        _pending_tool = {
+                            "tool": tool_name,
+                            "input": tool_input,
+                            "t0": time.monotonic(),
+                        }
+                        await cb.on_tool_call(self.agent_id, tool_name, tool_input)
+                        await cb.on_stream_event(self.agent_id, event)
+
+                    elif event.event_type == EventType.TOOL_RESULT:
+                        tool_output = payload.get("output") or payload.get("result") or ""
+                        if isinstance(tool_output, dict):
+                            tool_output = json.dumps(tool_output)
+                        if _pending_tool is not None:
+                            duration = int(
+                                (time.monotonic() - _pending_tool["t0"]) * 1000
+                            )
+                            tool_calls.append(
+                                ToolCall(
+                                    tool=_pending_tool["tool"],
+                                    input=_pending_tool["input"],
+                                    output=tool_output,
+                                    duration_ms=duration,
+                                )
+                            )
+                            await cb.on_tool_result(
+                                self.agent_id,
+                                _pending_tool["tool"],
+                                tool_output,
+                                duration,
+                            )
+                            _pending_tool = None
+                        await cb.on_stream_event(self.agent_id, event)
+
+                    elif event.event_type == EventType.FILE_GENERATED:
+                        gf = GeneratedFile(
+                            name=payload.get("name") or payload.get("fileName") or "",
+                            path=payload.get("path") or "",
+                            size_bytes=payload.get("sizeBytes") or payload.get("size") or 0,
+                            mime_type=(
+                                payload.get("mimeType")
+                                or payload.get("mime_type")
+                                or "application/octet-stream"
+                            ),
+                        )
+                        files.append(gf)
+                        await cb.on_file_generated(self.agent_id, gf)
+                        await cb.on_stream_event(self.agent_id, event)
+
                     elif event.event_type == EventType.DONE:
                         final = payload.get("content") or payload.get("text") or ""
                         if final:
                             content_parts.append(final)
+                        # Extract token usage from DONE payload.
+                        usage_data = (
+                            payload.get("usage")
+                            or payload.get("tokenUsage")
+                            or {}
+                        )
+                        if usage_data:
+                            token_usage = TokenUsage.from_gateway(usage_data)
+                        state = payload.get("state") or payload.get("status") or ""
+                        if state == "aborted":
+                            stop_reason = "aborted"
+                            success = False
+                        else:
+                            stop_reason = payload.get("stopReason") or "complete"
                         break
 
                     elif event.event_type == EventType.ERROR:
@@ -583,7 +675,12 @@ class Agent:
             ) from exc
 
         return ExecutionResult(
-            success=True,
+            success=success,
             content="".join(content_parts),
+            thinking="".join(thinking_parts) or None,
+            tool_calls=tool_calls,
+            files=files,
+            token_usage=token_usage,
+            stop_reason=stop_reason,
             latency_ms=int((time.monotonic() - t0) * 1000),
         )
