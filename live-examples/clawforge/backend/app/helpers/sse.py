@@ -69,6 +69,9 @@ def map_event(event_type: EventType, payload: dict) -> dict[str, str] | None:
                 return {"event": "tool_result", "data": json.dumps({
                     "output": data.get("output") or data.get("result") or "",
                 })}
+            # Unknown tool phase — log and pass through
+            log.info("AGENT tool phase=%s data=%s", phase, json.dumps(data)[:200])
+            return _sse("tool_call", tool=data.get("tool", ""), input=str(data))
 
         if stream == "file":
             fname = data.get("name") or data.get("fileName") or ""
@@ -79,6 +82,40 @@ def map_event(event_type: EventType, payload: dict) -> dict[str, str] | None:
                 "size": data.get("sizeBytes") or data.get("size") or 0,
                 "mimeType": data.get("mimeType") or "",
             })}
+
+        # Catch-all for AGENT events with unknown stream types
+        log.info(
+            "AGENT unknown stream=%r data_keys=%s payload=%s",
+            stream, list(data.keys()), json.dumps(payload)[:300],
+        )
+        return None
+
+    # Direct TOOL_CALL event (not nested inside AGENT)
+    if event_type == EventType.TOOL_CALL:
+        tool_name = payload.get("tool") or payload.get("name") or ""
+        log.info("TOOL_CALL tool=%s", tool_name)
+        return {"event": "tool_call", "data": json.dumps({
+            "tool": tool_name,
+            "input": payload.get("input") or "",
+        })}
+
+    # Direct TOOL_RESULT event
+    if event_type == EventType.TOOL_RESULT:
+        log.debug("TOOL_RESULT received")
+        return {"event": "tool_result", "data": json.dumps({
+            "output": payload.get("output") or payload.get("result") or "",
+        })}
+
+    # Direct FILE_GENERATED event
+    if event_type == EventType.FILE_GENERATED:
+        fname = payload.get("name") or payload.get("fileName") or ""
+        log.info("FILE_GENERATED name=%s", fname)
+        return {"event": "file_generated", "data": json.dumps({
+            "name": fname,
+            "path": payload.get("path") or "",
+            "size": payload.get("sizeBytes") or payload.get("size") or 0,
+            "mimeType": payload.get("mimeType") or "",
+        })}
 
     if event_type == EventType.CONTENT:
         text = payload.get("content") or payload.get("text") or ""
@@ -100,7 +137,7 @@ def map_event(event_type: EventType, payload: dict) -> dict[str, str] | None:
         log.error("ERROR event: %s", payload.get("message") or "Error")
         return _sse("error", message=payload.get("message") or "Error")
 
-    log.debug("Unmapped event_type=%s (skipped)", event_type)
+    log.debug("Unmapped event_type=%s payload=%s", event_type, json.dumps(payload)[:200])
     return None
 
 

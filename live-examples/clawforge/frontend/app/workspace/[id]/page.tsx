@@ -2,10 +2,11 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { getProject } from "@/lib/api";
+import { getProject, listProjects } from "@/lib/api";
 import { streamSSE } from "@/lib/sse";
 import { ChatPanel } from "@/components/chat-panel";
 import { PreviewPanel } from "@/components/preview-panel";
+import { ProjectSidebar } from "@/components/project-sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { Project, ChatMessage, GeneratedFile } from "@/lib/types";
@@ -20,15 +21,31 @@ export default function WorkspacePage() {
   const [streaming, setStreaming] = useState(false);
   const [buildMode, setBuildMode] = useState<"pipeline" | "supervisor">("pipeline");
   const [building, setBuilding] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [projects, setProjects] = useState<Project[]>([]);
 
   const [autoSent, setAutoSent] = useState(false);
 
+  // Load project + project list
   useEffect(() => {
     getProject(projectId).then((p) => {
       setProject(p);
       setMessages(p.messages || []);
       setFiles(p.files || []);
     });
+    listProjects().then(setProjects).catch(() => {});
+  }, [projectId]);
+
+  // Refresh project data (messages + files) from DB
+  const refreshProject = useCallback(async () => {
+    try {
+      const p = await getProject(projectId);
+      setProject(p);
+      setMessages(p.messages || []);
+      setFiles(p.files || []);
+    } catch (err) {
+      console.error("Refresh failed:", err);
+    }
   }, [projectId]);
 
   const handleSendMessage = useCallback(async (text: string) => {
@@ -75,9 +92,10 @@ export default function WorkspacePage() {
           if (event === "content") {
             fullContent += (d.text as string) || "";
             setMessages((prev) => {
+              if (prev.length === 0) return prev;
               const updated = [...prev];
               const last = updated[updated.length - 1];
-              if (last.role === "assistant") {
+              if (last && last.role === "assistant") {
                 updated[updated.length - 1] = { ...last, content: fullContent };
               }
               return updated;
@@ -85,23 +103,38 @@ export default function WorkspacePage() {
           } else if (event === "thinking") {
             fullThinking += (d.text as string) || "";
             setMessages((prev) => {
+              if (prev.length === 0) return prev;
               const updated = [...prev];
               const last = updated[updated.length - 1];
-              if (last.role === "assistant") {
+              if (last && last.role === "assistant") {
                 updated[updated.length - 1] = { ...last, thinking: fullThinking };
               }
               return updated;
             });
           } else if (event === "tool_call") {
             setMessages((prev) => {
+              if (prev.length === 0) return prev;
               const updated = [...prev];
               const last = updated[updated.length - 1];
-              if (last.role === "assistant") {
+              if (last && last.role === "assistant") {
                 const calls = last.tool_calls || [];
                 updated[updated.length - 1] = {
                   ...last,
                   tool_calls: [...calls, { tool: d.tool as string, input: d.input as string }],
                 };
+              }
+              return updated;
+            });
+          } else if (event === "tool_result") {
+            setMessages((prev) => {
+              if (prev.length === 0) return prev;
+              const updated = [...prev];
+              const last = updated[updated.length - 1];
+              if (last && last.role === "assistant" && last.tool_calls && last.tool_calls.length > 0) {
+                const calls = [...last.tool_calls];
+                const lastCall = calls[calls.length - 1];
+                calls[calls.length - 1] = { ...lastCall, output: (d.output as string) || "" };
+                updated[updated.length - 1] = { ...last, tool_calls: calls };
               }
               return updated;
             });
@@ -123,8 +156,10 @@ export default function WorkspacePage() {
       console.error("Stream error:", err);
     } finally {
       setStreaming(false);
+      // Re-fetch project from DB to get saved messages, files, and costs
+      refreshProject();
     }
-  }, [projectId]);
+  }, [projectId, refreshProject]);
 
   // Auto-send the project description as the first message for new projects
   useEffect(() => {
@@ -168,8 +203,10 @@ export default function WorkspacePage() {
     } catch (err) {
       console.error("Build error:", err);
       setBuilding(false);
+    } finally {
+      refreshProject();
     }
-  }, [projectId, buildMode]);
+  }, [projectId, buildMode, refreshProject]);
 
   if (!project) {
     return (
@@ -180,49 +217,70 @@ export default function WorkspacePage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] flex-col">
-      {/* Top bar */}
-      <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-2">
-        <div className="flex items-center gap-3">
-          <h1 className="font-semibold truncate max-w-md">{project.name}</h1>
-          <Badge variant="outline" className="text-xs">
-            {project.status}
-          </Badge>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-zinc-500">
-            ${project.total_cost_usd.toFixed(4)}
-          </span>
-          <select
-            value={buildMode}
-            onChange={(e) => setBuildMode(e.target.value as "pipeline" | "supervisor")}
-            className="rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-zinc-300"
-          >
-            <option value="pipeline">Pipeline</option>
-            <option value="supervisor">Supervisor</option>
-          </select>
-          <Button
-            size="sm"
-            onClick={handleBuild}
-            disabled={building}
-            className="bg-emerald-600 hover:bg-emerald-500"
-          >
-            {building ? "Building..." : "Build"}
-          </Button>
-        </div>
-      </div>
+    <div className="flex h-[calc(100vh-3.5rem)]">
+      {/* Project sidebar */}
+      {sidebarOpen && (
+        <ProjectSidebar
+          projects={projects}
+          currentId={projectId}
+          onClose={() => setSidebarOpen(false)}
+        />
+      )}
 
-      {/* Two-panel layout */}
-      <div className="flex flex-1 overflow-hidden">
-        <div className="w-[45%] border-r border-zinc-800">
-          <ChatPanel
-            messages={messages}
-            onSend={handleSendMessage}
-            streaming={streaming}
-          />
+      {/* Main workspace */}
+      <div className="flex flex-1 flex-col min-w-0">
+        {/* Top bar */}
+        <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-2">
+          <div className="flex items-center gap-3">
+            {!sidebarOpen && (
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="mr-1 rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+                title="Show projects"
+              >
+                &#9776;
+              </button>
+            )}
+            <h1 className="font-semibold truncate max-w-md">{project.name}</h1>
+            <Badge variant="outline" className="text-xs">
+              {project.status}
+            </Badge>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-zinc-500">
+              ${project.total_cost_usd.toFixed(4)}
+            </span>
+            <select
+              value={buildMode}
+              onChange={(e) => setBuildMode(e.target.value as "pipeline" | "supervisor")}
+              className="rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-zinc-300"
+            >
+              <option value="pipeline">Pipeline</option>
+              <option value="supervisor">Supervisor</option>
+            </select>
+            <Button
+              size="sm"
+              onClick={handleBuild}
+              disabled={building}
+              className="bg-emerald-600 hover:bg-emerald-500"
+            >
+              {building ? "Building..." : "Build"}
+            </Button>
+          </div>
         </div>
-        <div className="w-[55%]">
-          <PreviewPanel files={files} messages={messages} />
+
+        {/* Two-panel layout */}
+        <div className="flex flex-1 overflow-hidden">
+          <div className="w-[45%] border-r border-zinc-800">
+            <ChatPanel
+              messages={messages}
+              onSend={handleSendMessage}
+              streaming={streaming}
+            />
+          </div>
+          <div className="w-[55%]">
+            <PreviewPanel files={files} messages={messages} />
+          </div>
         </div>
       </div>
     </div>

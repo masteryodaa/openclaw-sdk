@@ -34,10 +34,14 @@ export async function streamSSE(
 
     let currentEvent = "message";
     for (const line of lines) {
-      if (line.startsWith("event:")) {
-        currentEvent = line.slice(6).trim();
-      } else if (line.startsWith("data:")) {
-        const dataStr = line.slice(5).trim();
+      const trimmed = line.replace(/\r$/, ""); // strip trailing \r from \r\n
+      if (trimmed === "") {
+        // Blank line = end of event, reset for next
+        currentEvent = "message";
+      } else if (trimmed.startsWith("event:")) {
+        currentEvent = trimmed.slice(6).trim();
+      } else if (trimmed.startsWith("data:")) {
+        const dataStr = trimmed.slice(5).trim();
         try {
           const data = JSON.parse(dataStr);
           onEvent(currentEvent, data);
@@ -45,6 +49,7 @@ export async function streamSSE(
           onEvent(currentEvent, dataStr);
         }
       }
+      // Skip comment lines (starting with :)
     }
   }
 }
