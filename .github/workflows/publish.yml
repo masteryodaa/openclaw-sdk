@@ -23,7 +23,7 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -e ".[fastapi]"
-          pip install pytest pytest-asyncio pytest-cov mypy ruff
+          pip install pytest pytest-asyncio pytest-cov mypy ruff cryptography
 
       - name: Run tests
         run: python -m pytest tests/ -q
