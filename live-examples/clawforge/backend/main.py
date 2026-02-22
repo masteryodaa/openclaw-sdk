@@ -7,6 +7,7 @@ Run:
 
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -22,18 +23,37 @@ from app.routers.health import router as health_router
 from app.routers.projects import router as projects_router
 from app.routers.templates import router as templates_router
 
+# ---------------------------------------------------------------------------
+# Logging setup — all backend modules use logging.getLogger(__name__)
+# ---------------------------------------------------------------------------
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s | %(levelname)-7s | %(name)s | %(message)s",
+    datefmt="%H:%M:%S",
+)
+# Quiet noisy third-party loggers
+logging.getLogger("websockets").setLevel(logging.WARNING)
+logging.getLogger("aiosqlite").setLevel(logging.WARNING)
+logging.getLogger("uvicorn.access").setLevel(logging.INFO)
+
+log = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    log.info("Initialising database...")
     await database.init_db()
+    log.info("Database ready")
     try:
         await gateway.connect()
-        print(f"[OK] Connected to OpenClaw at {gateway.GATEWAY_URL}")
+        log.info("Connected to OpenClaw at %s", gateway.GATEWAY_URL)
     except Exception as exc:
-        print(f"[WARN] Gateway unavailable: {exc}")
-        print("       Start OpenClaw -- the app will connect on first request.")
+        log.warning("Gateway unavailable: %s", exc)
+        log.warning("Start OpenClaw -- the app will connect on first request.")
     yield
+    log.info("Shutting down — disconnecting gateway")
     await gateway.disconnect()
+    log.info("Shutdown complete")
 
 
 app = FastAPI(title="ClawForge", version="1.0.0", lifespan=lifespan)

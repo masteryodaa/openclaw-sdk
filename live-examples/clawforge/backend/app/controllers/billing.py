@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import logging
+
 from app.helpers import database
+
+log = logging.getLogger(__name__)
 
 
 async def get_summary() -> dict:
     """Get overall billing summary across all projects."""
+    log.info("Fetching billing summary")
     projects = await database.list_projects()
     total_cost = sum(p.get("total_cost_usd", 0) for p in projects)
     total_tokens = sum(p.get("total_tokens", 0) for p in projects)
@@ -22,6 +27,10 @@ async def get_summary() -> dict:
             "message_count": len(messages),
         })
 
+    log.info(
+        "Billing summary: %d projects, $%.4f total, %d tokens",
+        len(projects), total_cost, total_tokens,
+    )
     return {
         "total_cost_usd": total_cost,
         "total_tokens": total_tokens,
@@ -32,8 +41,10 @@ async def get_summary() -> dict:
 
 async def get_project_costs(project_id: str) -> dict | None:
     """Get cost breakdown for a single project."""
+    log.info("Fetching costs for project %s", project_id[:8])
     project = await database.get_project(project_id)
     if not project:
+        log.warning("Project %s not found for billing", project_id[:8])
         return None
 
     messages = await database.get_messages(project_id)
@@ -48,6 +59,7 @@ async def get_project_costs(project_id: str) -> dict | None:
                 "created_at": m["created_at"],
             })
 
+    log.debug("Project %s: %d messages, %d with costs", project_id[:8], len(messages), len(message_costs))
     return {
         "project_id": project_id,
         "project_name": project["name"],

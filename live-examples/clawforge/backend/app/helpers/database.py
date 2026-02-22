@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
 import aiosqlite
+
+log = logging.getLogger(__name__)
 
 DB_PATH = Path(__file__).resolve().parent.parent.parent / "clawforge.db"
 
@@ -23,6 +26,7 @@ async def _get_db() -> aiosqlite.Connection:
 
 async def init_db() -> None:
     """Create tables if they do not exist."""
+    log.info("Initialising database at %s", DB_PATH)
     db = await _get_db()
     try:
         await db.execute("""
@@ -68,6 +72,7 @@ async def init_db() -> None:
             )
         """)
         await db.commit()
+        log.info("Database tables ready")
     finally:
         await db.close()
 
@@ -93,6 +98,7 @@ async def create_project(
     """Create a new project and return it."""
     project_id = uuid.uuid4().hex
     now = _now()
+    log.info("Creating project id=%s name=%r template=%s", project_id[:8], name, template)
     db = await _get_db()
     try:
         await db.execute(
@@ -101,6 +107,7 @@ async def create_project(
             (project_id, name, description, template, now, now),
         )
         await db.commit()
+        log.debug("Project %s created", project_id[:8])
     finally:
         await db.close()
     return {
@@ -119,11 +126,13 @@ async def create_project(
 
 async def get_project(project_id: str) -> dict | None:
     """Get a single project by ID."""
+    log.debug("Fetching project %s", project_id[:8])
     db = await _get_db()
     try:
         cursor = await db.execute("SELECT * FROM projects WHERE id = ?", (project_id,))
         row = await cursor.fetchone()
         if not row:
+            log.debug("Project %s not found", project_id[:8])
             return None
         d = _row_to_dict(row)
         d["plan_json"] = json.loads(d["plan_json"]) if d["plan_json"] else None
@@ -134,6 +143,7 @@ async def get_project(project_id: str) -> dict | None:
 
 async def list_projects() -> list[dict]:
     """List all projects, newest first."""
+    log.debug("Listing all projects")
     db = await _get_db()
     try:
         cursor = await db.execute("SELECT * FROM projects ORDER BY created_at DESC")
@@ -143,6 +153,7 @@ async def list_projects() -> list[dict]:
             d = _row_to_dict(row)
             d["plan_json"] = json.loads(d["plan_json"]) if d["plan_json"] else None
             results.append(d)
+        log.debug("Found %d projects", len(results))
         return results
     finally:
         await db.close()
@@ -153,6 +164,7 @@ async def update_project(project_id: str, **fields: object) -> dict | None:
     if not fields:
         return await get_project(project_id)
     fields["updated_at"] = _now()
+    log.info("Updating project %s fields=%s", project_id[:8], list(fields.keys()))
 
     # Serialize plan_json if provided as dict
     if "plan_json" in fields and isinstance(fields["plan_json"], dict):
@@ -170,6 +182,7 @@ async def update_project(project_id: str, **fields: object) -> dict | None:
         )
         await db.commit()
         if cursor.rowcount == 0:
+            log.warning("Update failed — project %s not found", project_id[:8])
             return None
     finally:
         await db.close()
@@ -178,13 +191,16 @@ async def update_project(project_id: str, **fields: object) -> dict | None:
 
 async def delete_project(project_id: str) -> bool:
     """Delete project and cascade to messages + files."""
+    log.info("Deleting project %s (cascade)", project_id[:8])
     db = await _get_db()
     try:
         await db.execute("DELETE FROM messages WHERE project_id = ?", (project_id,))
         await db.execute("DELETE FROM generated_files WHERE project_id = ?", (project_id,))
         cursor = await db.execute("DELETE FROM projects WHERE id = ?", (project_id,))
         await db.commit()
-        return cursor.rowcount > 0
+        deleted = cursor.rowcount > 0
+        log.info("Project %s deleted=%s", project_id[:8], deleted)
+        return deleted
     finally:
         await db.close()
 
@@ -206,6 +222,10 @@ async def add_message(
     """Add a message to a project."""
     msg_id = uuid.uuid4().hex
     now = _now()
+    log.debug(
+        "Adding message project=%s role=%s len=%d",
+        project_id[:8], role, len(content),
+    )
     db = await _get_db()
     try:
         await db.execute(
@@ -244,6 +264,7 @@ async def add_message(
 
 async def get_messages(project_id: str) -> list[dict]:
     """Get all messages for a project, oldest first."""
+    log.debug("Fetching messages for project %s", project_id[:8])
     db = await _get_db()
     try:
         cursor = await db.execute(
@@ -258,6 +279,7 @@ async def get_messages(project_id: str) -> list[dict]:
             d["files"] = json.loads(d["files"]) if d["files"] else None
             d["token_usage"] = json.loads(d["token_usage"]) if d["token_usage"] else None
             results.append(d)
+        log.debug("Found %d messages for project %s", len(results), project_id[:8])
         return results
     finally:
         await db.close()
@@ -278,6 +300,7 @@ async def add_file(
     """Add a generated file record."""
     file_id = uuid.uuid4().hex
     now = _now()
+    log.info("Adding file project=%s name=%r path=%r", project_id[:8], name, path)
     db = await _get_db()
     try:
         await db.execute(
@@ -303,6 +326,7 @@ async def add_file(
 
 async def get_files(project_id: str) -> list[dict]:
     """Get all generated files for a project."""
+    log.debug("Fetching files for project %s", project_id[:8])
     db = await _get_db()
     try:
         cursor = await db.execute(
@@ -310,6 +334,7 @@ async def get_files(project_id: str) -> list[dict]:
             (project_id,),
         )
         rows = await cursor.fetchall()
+        log.debug("Found %d files for project %s", len(rows), project_id[:8])
         return [_row_to_dict(row) for row in rows]
     finally:
         await db.close()

@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import logging
+
 from app.helpers import database
+
+log = logging.getLogger(__name__)
 
 # ClawForge templates mapped to SDK agent template archetypes
 TEMPLATES = [
@@ -65,6 +69,7 @@ TEMPLATES = [
 
 def list_templates() -> list[dict]:
     """Return all available templates."""
+    log.debug("Listing %d templates", len(TEMPLATES))
     return TEMPLATES
 
 
@@ -72,18 +77,23 @@ def get_template(template_id: str) -> dict | None:
     """Get a template by ID."""
     for t in TEMPLATES:
         if t["id"] == template_id:
+            log.debug("Found template %s", template_id)
             return t
+    log.warning("Template %r not found", template_id)
     return None
 
 
 async def create_from_template(template_id: str, name: str = "") -> dict | None:
     """Create a project pre-filled from a template."""
+    log.info("Creating project from template=%s name=%r", template_id, name)
     template = get_template(template_id)
     if not template:
         return None
     project_name = name or f"{template['name']} Project"
-    return await database.create_project(
+    result = await database.create_project(
         project_name,
         template["description"],
         template=template_id,
     )
+    log.info("Project created from template: id=%s", result["id"][:8])
+    return result
