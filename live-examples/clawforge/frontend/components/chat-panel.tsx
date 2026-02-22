@@ -4,19 +4,21 @@ import { useRef, useEffect, useCallback } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChatMessage } from "@/components/chat-message";
 import { PromptInput } from "@/components/prompt-input";
+import { StreamingIndicator } from "@/components/streaming-indicator";
 import type { ChatMessage as ChatMessageType } from "@/lib/types";
+import type { StreamingStatus } from "@/app/workspace/[id]/page";
 
 interface ChatPanelProps {
   messages: ChatMessageType[];
   onSend: (text: string) => void;
   streaming: boolean;
+  streamStatus?: StreamingStatus;
 }
 
-export function ChatPanel({ messages, onSend, streaming }: ChatPanelProps) {
+export function ChatPanel({ messages, onSend, streaming, streamStatus }: ChatPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = useCallback(() => {
-    // ScrollArea uses a [data-radix-scroll-area-viewport] child as the actual scrollable element
     const viewport = scrollRef.current?.querySelector("[data-radix-scroll-area-viewport]");
     if (viewport) {
       viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" });
@@ -24,10 +26,9 @@ export function ChatPanel({ messages, onSend, streaming }: ChatPanelProps) {
   }, []);
 
   useEffect(() => {
-    // Small delay to let React finish rendering new content
     const t = setTimeout(scrollToBottom, 50);
     return () => clearTimeout(t);
-  }, [messages, scrollToBottom]);
+  }, [messages, streamStatus, scrollToBottom]);
 
   return (
     <div className="flex h-full flex-col">
@@ -42,6 +43,10 @@ export function ChatPanel({ messages, onSend, streaming }: ChatPanelProps) {
               messages.map((msg) => (
                 <ChatMessage key={msg.id} message={msg} />
               ))
+            )}
+            {/* Real-time streaming indicator */}
+            {streamStatus?.active && (
+              <StreamingIndicator status={streamStatus} />
             )}
           </div>
         </ScrollArea>

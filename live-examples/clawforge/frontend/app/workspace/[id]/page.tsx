@@ -11,6 +11,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { Project, ChatMessage, GeneratedFile } from "@/lib/types";
 
+/** Describes what the agent is currently doing. */
+export interface StreamingStatus {
+  active: boolean;
+  phase: string; // "thinking" | "tool_call" | "content" | "start" | "end" | ""
+  toolName?: string;
+}
+
 export default function WorkspacePage() {
   const params = useParams();
   const projectId = params.id as string;
@@ -19,6 +26,7 @@ export default function WorkspacePage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [files, setFiles] = useState<GeneratedFile[]>([]);
   const [streaming, setStreaming] = useState(false);
+  const [streamStatus, setStreamStatus] = useState<StreamingStatus>({ active: false, phase: "" });
   const [buildMode, setBuildMode] = useState<"pipeline" | "supervisor">("pipeline");
   const [building, setBuilding] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -64,6 +72,7 @@ export default function WorkspacePage() {
     };
     setMessages((prev) => [...prev, userMsg]);
     setStreaming(true);
+    setStreamStatus({ active: true, phase: "start" });
 
     // Stream response
     let fullContent = "";
@@ -89,8 +98,16 @@ export default function WorkspacePage() {
         { project_id: projectId, message: text, thinking: true },
         (event, data: unknown) => {
           const d = data as Record<string, unknown>;
-          if (event === "content") {
+
+          if (event === "run_start") {
+            setStreamStatus({ active: true, phase: "start" });
+          } else if (event === "status") {
+            // Lifecycle / activity events from the agent
+            const phase = (d.phase as string) || "";
+            setStreamStatus({ active: true, phase });
+          } else if (event === "content") {
             fullContent += (d.text as string) || "";
+            setStreamStatus({ active: true, phase: "content" });
             setMessages((prev) => {
               if (prev.length === 0) return prev;
               const updated = [...prev];
@@ -102,6 +119,7 @@ export default function WorkspacePage() {
             });
           } else if (event === "thinking") {
             fullThinking += (d.text as string) || "";
+            setStreamStatus({ active: true, phase: "thinking" });
             setMessages((prev) => {
               if (prev.length === 0) return prev;
               const updated = [...prev];
@@ -112,6 +130,8 @@ export default function WorkspacePage() {
               return updated;
             });
           } else if (event === "tool_call") {
+            const toolName = (d.tool as string) || "tool";
+            setStreamStatus({ active: true, phase: "tool_call", toolName });
             setMessages((prev) => {
               if (prev.length === 0) return prev;
               const updated = [...prev];
@@ -120,12 +140,13 @@ export default function WorkspacePage() {
                 const calls = last.tool_calls || [];
                 updated[updated.length - 1] = {
                   ...last,
-                  tool_calls: [...calls, { tool: d.tool as string, input: d.input as string }],
+                  tool_calls: [...calls, { tool: toolName, input: (d.input as string) || "" }],
                 };
               }
               return updated;
             });
           } else if (event === "tool_result") {
+            setStreamStatus({ active: true, phase: "start" }); // back to working
             setMessages((prev) => {
               if (prev.length === 0) return prev;
               const updated = [...prev];
@@ -156,7 +177,7 @@ export default function WorkspacePage() {
       console.error("Stream error:", err);
     } finally {
       setStreaming(false);
-      // Re-fetch project from DB to get saved messages, files, and costs
+      setStreamStatus({ active: false, phase: "" });
       refreshProject();
     }
   }, [projectId, refreshProject]);
@@ -178,7 +199,6 @@ export default function WorkspacePage() {
         (event, data: unknown) => {
           const d = data as Record<string, unknown>;
           if (event === "step_start" || event === "step_complete" || event === "build_complete" || event === "build_error") {
-            // Add build events as system messages
             const content = event === "build_error"
               ? `[Build Error] ${d.message as string}`
               : `[${event}] ${(d.step as string) || ""} ${(d.content as string) || ""}`.trim();
@@ -276,6 +296,7 @@ export default function WorkspacePage() {
               messages={messages}
               onSend={handleSendMessage}
               streaming={streaming}
+              streamStatus={streamStatus}
             />
           </div>
           <div className="w-[55%]">

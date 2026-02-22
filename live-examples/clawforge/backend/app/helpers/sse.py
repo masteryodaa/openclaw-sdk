@@ -83,12 +83,25 @@ def map_event(event_type: EventType, payload: dict) -> dict[str, str] | None:
                 "mimeType": data.get("mimeType") or "",
             })}
 
+        if stream == "lifecycle":
+            phase = data.get("phase", "")
+            log.info("AGENT lifecycle phase=%s", phase)
+            return {"event": "status", "data": json.dumps({
+                "phase": phase,
+                "startedAt": data.get("startedAt"),
+                "endedAt": data.get("endedAt"),
+            })}
+
         # Catch-all for AGENT events with unknown stream types
         log.info(
             "AGENT unknown stream=%r data_keys=%s payload=%s",
             stream, list(data.keys()), json.dumps(payload)[:300],
         )
-        return None
+        # Forward as status so frontend sees activity
+        return {"event": "status", "data": json.dumps({
+            "phase": stream,
+            "detail": json.dumps(data)[:200] if data else "",
+        })}
 
     # Direct TOOL_CALL event (not nested inside AGENT)
     if event_type == EventType.TOOL_CALL:
