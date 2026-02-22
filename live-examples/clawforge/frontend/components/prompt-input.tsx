@@ -9,6 +9,7 @@ interface PromptInputProps {
   placeholder?: string;
   loading?: boolean;
   buttonText?: string;
+  compact?: boolean;
 }
 
 export function PromptInput({
@@ -16,6 +17,7 @@ export function PromptInput({
   placeholder = "Describe what you want to build...",
   loading = false,
   buttonText = "Start Building",
+  compact = false,
 }: PromptInputProps) {
   const [text, setText] = useState("");
 
@@ -26,11 +28,39 @@ export function PromptInput({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+    // Enter sends in compact mode, Ctrl+Enter in full mode
+    if (compact && e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit();
+    } else if (!compact && e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       handleSubmit();
     }
   };
+
+  if (compact) {
+    return (
+      <div className="flex items-end gap-2">
+        <Textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          className="min-h-[44px] max-h-[120px] resize-none rounded-lg border-zinc-700 bg-zinc-900 text-sm placeholder:text-zinc-500 focus:border-emerald-500 focus:ring-emerald-500/20"
+          disabled={loading}
+          rows={1}
+        />
+        <Button
+          onClick={handleSubmit}
+          disabled={!text.trim() || loading}
+          className="shrink-0 bg-emerald-600 hover:bg-emerald-500 text-white h-[44px] px-4"
+          size="sm"
+        >
+          {loading ? "..." : buttonText}
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="relative">
