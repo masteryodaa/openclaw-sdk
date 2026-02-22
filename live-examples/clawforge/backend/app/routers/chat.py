@@ -61,3 +61,46 @@ async def chat_stream(body: ChatRequest):
             timeout_seconds=body.timeout_seconds,
         )
     )
+
+
+@router.get("/session-status/{project_id}")
+async def session_status(project_id: str, agent_id: str = "main"):
+    """Poll the agent session for real-time tool activity."""
+    log.debug("GET /api/chat/session-status/%s", project_id[:8])
+    client = await gateway.get_client()
+    session_key = f"agent:{agent_id}:clawforge-{project_id}"
+    try:
+        result = await client.gateway.call(
+            "sessions.preview", {"keys": [session_key]}
+        )
+        previews = result.get("previews") or []
+        if not previews:
+            return {"items": [], "tools": [], "files": []}
+
+        items = previews[0].get("items", [])
+        # Extract tool calls and file writes
+        tools = []
+        files = []
+        for item in items:
+            if item.get("role") == "tool":
+                text = item.get("text", "")
+                if text.startswith("call "):
+                    tool_name = text[5:].strip()
+                    tools.append({"tool": tool_name, "phase": "call"})
+                elif "wrote" in text.lower() and "bytes to" in text.lower():
+                    # Parse: "Successfully wrote 10800 bytes to shoe-store/modern-landing.html"
+                    import re
+                    m = re.search(r"wrote\s+(\d+)\s+bytes\s+to\s+(.+)", text, re.I)
+                    if m:
+                        files.append({
+                            "path": m.group(2).strip(),
+                            "size": int(m.group(1)),
+                        })
+                    tools.append({"tool": "write", "phase": "result", "output": text})
+                else:
+                    tools.append({"tool": "unknown", "phase": "result", "output": text})
+
+        return {"tools": tools, "files": files}
+    except Exception as exc:
+        log.warning("session-status error: %s", exc)
+        return {"tools": [], "files": [], "error": str(exc)}

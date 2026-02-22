@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
-import { getProject, listProjects } from "@/lib/api";
+import { getProject, listProjects, getSessionStatus, readWorkspaceFile } from "@/lib/api";
 import { streamSSE } from "@/lib/sse";
 import { ChatPanel } from "@/components/chat-panel";
 import { PreviewPanel } from "@/components/preview-panel";
@@ -10,12 +10,15 @@ import { ProjectSidebar } from "@/components/project-sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { Project, ChatMessage, GeneratedFile } from "@/lib/types";
+import type { SessionTool } from "@/lib/api";
 
-/** Describes what the agent is currently doing. */
+/** Describes what the agent is currently doing — with real tool names. */
 export interface StreamingStatus {
   active: boolean;
-  phase: string; // "thinking" | "tool_call" | "content" | "start" | "end" | ""
+  phase: string;
   toolName?: string;
+  toolHistory: SessionTool[];
+  elapsed: number;
 }
 
 export default function WorkspacePage() {
@@ -26,15 +29,19 @@ export default function WorkspacePage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [files, setFiles] = useState<GeneratedFile[]>([]);
   const [streaming, setStreaming] = useState(false);
-  const [streamStatus, setStreamStatus] = useState<StreamingStatus>({ active: false, phase: "" });
+  const [streamStatus, setStreamStatus] = useState<StreamingStatus>({
+    active: false, phase: "", toolHistory: [], elapsed: 0,
+  });
   const [buildMode, setBuildMode] = useState<"pipeline" | "supervisor">("pipeline");
   const [building, setBuilding] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [workspaceHtml, setWorkspaceHtml] = useState<string | null>(null);
 
   const [autoSent, setAutoSent] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startTimeRef = useRef<number>(0);
 
-  // Load project + project list
   useEffect(() => {
     getProject(projectId).then((p) => {
       setProject(p);
@@ -42,9 +49,17 @@ export default function WorkspacePage() {
       setFiles(p.files || []);
     });
     listProjects().then(setProjects).catch(() => {});
+    // Initial poll: check for workspace files from previous runs
+    getSessionStatus(projectId).then((status) => {
+      for (const f of status.files) {
+        if (f.path.endsWith(".html") || f.path.endsWith(".htm")) {
+          readWorkspaceFile(f.path).then(setWorkspaceHtml).catch(() => {});
+          break; // Use the first HTML file found
+        }
+      }
+    }).catch(() => {});
   }, [projectId]);
 
-  // Refresh project data (messages + files) from DB
   const refreshProject = useCallback(async () => {
     try {
       const p = await getProject(projectId);
@@ -56,8 +71,53 @@ export default function WorkspacePage() {
     }
   }, [projectId]);
 
+  // Poll session for real tool names during streaming
+  const startSessionPolling = useCallback(() => {
+    if (pollRef.current) return;
+    startTimeRef.current = Date.now();
+    pollRef.current = setInterval(async () => {
+      try {
+        const status = await getSessionStatus(projectId);
+        const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+        if (status.tools.length > 0) {
+          const lastTool = status.tools[status.tools.length - 1];
+          setStreamStatus((prev) => ({
+            ...prev,
+            phase: lastTool.phase === "call" ? "tool_call" : prev.phase,
+            toolName: lastTool.phase === "call" ? lastTool.tool : prev.toolName,
+            toolHistory: status.tools,
+            elapsed,
+          }));
+        } else {
+          setStreamStatus((prev) => ({ ...prev, elapsed }));
+        }
+        // If file was written, fetch its content for preview
+        if (status.files.length > 0) {
+          for (const f of status.files) {
+            if (f.path.endsWith(".html") || f.path.endsWith(".htm")) {
+              try {
+                const html = await readWorkspaceFile(f.path);
+                setWorkspaceHtml(html);
+              } catch { /* ignore */ }
+            }
+          }
+        }
+      } catch { /* polling failure is not fatal */ }
+    }, 2500);
+  }, [projectId]);
+
+  const stopSessionPolling = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => stopSessionPolling();
+  }, [stopSessionPolling]);
+
   const handleSendMessage = useCallback(async (text: string) => {
-    // Add user message optimistically
     const userMsg: ChatMessage = {
       id: `temp-${Date.now()}`,
       project_id: projectId,
@@ -72,9 +132,9 @@ export default function WorkspacePage() {
     };
     setMessages((prev) => [...prev, userMsg]);
     setStreaming(true);
-    setStreamStatus({ active: true, phase: "start" });
+    setStreamStatus({ active: true, phase: "start", toolHistory: [], elapsed: 0 });
+    startSessionPolling();
 
-    // Stream response
     let fullContent = "";
     let fullThinking = "";
 
@@ -100,14 +160,13 @@ export default function WorkspacePage() {
           const d = data as Record<string, unknown>;
 
           if (event === "run_start") {
-            setStreamStatus({ active: true, phase: "start" });
+            setStreamStatus((prev) => ({ ...prev, active: true, phase: "start" }));
           } else if (event === "status") {
-            // Lifecycle / activity events from the agent
             const phase = (d.phase as string) || "";
-            setStreamStatus({ active: true, phase });
+            setStreamStatus((prev) => ({ ...prev, active: true, phase }));
           } else if (event === "content") {
             fullContent += (d.text as string) || "";
-            setStreamStatus({ active: true, phase: "content" });
+            setStreamStatus((prev) => ({ ...prev, phase: "content" }));
             setMessages((prev) => {
               if (prev.length === 0) return prev;
               const updated = [...prev];
@@ -119,7 +178,7 @@ export default function WorkspacePage() {
             });
           } else if (event === "thinking") {
             fullThinking += (d.text as string) || "";
-            setStreamStatus({ active: true, phase: "thinking" });
+            setStreamStatus((prev) => ({ ...prev, phase: "thinking" }));
             setMessages((prev) => {
               if (prev.length === 0) return prev;
               const updated = [...prev];
@@ -131,7 +190,7 @@ export default function WorkspacePage() {
             });
           } else if (event === "tool_call") {
             const toolName = (d.tool as string) || "tool";
-            setStreamStatus({ active: true, phase: "tool_call", toolName });
+            setStreamStatus((prev) => ({ ...prev, phase: "tool_call", toolName }));
             setMessages((prev) => {
               if (prev.length === 0) return prev;
               const updated = [...prev];
@@ -146,7 +205,7 @@ export default function WorkspacePage() {
               return updated;
             });
           } else if (event === "tool_result") {
-            setStreamStatus({ active: true, phase: "start" }); // back to working
+            setStreamStatus((prev) => ({ ...prev, phase: "start" }));
             setMessages((prev) => {
               if (prev.length === 0) return prev;
               const updated = [...prev];
@@ -176,13 +235,27 @@ export default function WorkspacePage() {
     } catch (err) {
       console.error("Stream error:", err);
     } finally {
+      stopSessionPolling();
       setStreaming(false);
-      setStreamStatus({ active: false, phase: "" });
+      setStreamStatus({ active: false, phase: "", toolHistory: [], elapsed: 0 });
+
+      // Final poll: catch any files written during execution
+      try {
+        const finalStatus = await getSessionStatus(projectId);
+        for (const f of finalStatus.files) {
+          if (f.path.endsWith(".html") || f.path.endsWith(".htm")) {
+            try {
+              const html = await readWorkspaceFile(f.path);
+              setWorkspaceHtml(html);
+            } catch { /* ignore */ }
+          }
+        }
+      } catch { /* ignore */ }
+
       refreshProject();
     }
-  }, [projectId, refreshProject]);
+  }, [projectId, refreshProject, startSessionPolling, stopSessionPolling]);
 
-  // Auto-send the project description as the first message for new projects
   useEffect(() => {
     if (project && !autoSent && messages.length === 0 && project.description) {
       setAutoSent(true);
@@ -238,7 +311,6 @@ export default function WorkspacePage() {
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)]">
-      {/* Project sidebar */}
       {sidebarOpen && (
         <ProjectSidebar
           projects={projects}
@@ -247,9 +319,7 @@ export default function WorkspacePage() {
         />
       )}
 
-      {/* Main workspace */}
       <div className="flex flex-1 flex-col min-w-0">
-        {/* Top bar */}
         <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-2">
           <div className="flex items-center gap-3">
             {!sidebarOpen && (
@@ -289,7 +359,6 @@ export default function WorkspacePage() {
           </div>
         </div>
 
-        {/* Two-panel layout */}
         <div className="flex flex-1 overflow-hidden">
           <div className="w-[45%] border-r border-zinc-800">
             <ChatPanel
@@ -300,7 +369,7 @@ export default function WorkspacePage() {
             />
           </div>
           <div className="w-[55%]">
-            <PreviewPanel files={files} messages={messages} />
+            <PreviewPanel files={files} messages={messages} workspaceHtml={workspaceHtml} />
           </div>
         </div>
       </div>

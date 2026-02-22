@@ -59,3 +59,18 @@ export const getBillingSummary = () => fetchAPI<BillingSummary>("/api/billing/su
 // Files
 export const getProjectFiles = (projectId: string) =>
   fetchAPI<GeneratedFile[]>(`/api/files/${projectId}`);
+
+// Workspace files (from OpenClaw's agent workspace)
+export const readWorkspaceFile = async (path: string): Promise<string> => {
+  const res = await fetch(`${API_URL}/api/files/workspace/${path}`);
+  if (!res.ok) throw new Error(`Failed to read workspace file: ${res.status}`);
+  return res.text();
+};
+
+// Session status (real-time tool activity polling)
+export interface SessionTool { tool: string; phase: string; output?: string }
+export interface SessionFile { path: string; size: number }
+export interface SessionStatus { tools: SessionTool[]; files: SessionFile[]; error?: string }
+
+export const getSessionStatus = (projectId: string, agentId = "main") =>
+  fetchAPI<SessionStatus>(`/api/chat/session-status/${projectId}?agent_id=${agentId}`);

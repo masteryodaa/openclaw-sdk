@@ -11,6 +11,7 @@ import type { GeneratedFile, ChatMessage } from "@/lib/types";
 interface PreviewPanelProps {
   files: GeneratedFile[];
   messages: ChatMessage[];
+  workspaceHtml?: string | null;
 }
 
 interface BuildEvent {
@@ -55,8 +56,14 @@ function extractCodeBlocks(messages: ChatMessage[]): ExtractedCode[] {
  * Find the best HTML content to preview.
  * Checks code blocks first, then generated files.
  */
-function findPreviewableHtml(codeBlocks: ExtractedCode[], files: GeneratedFile[]): string | null {
-  // Prefer the latest HTML code block
+function findPreviewableHtml(
+  codeBlocks: ExtractedCode[],
+  files: GeneratedFile[],
+  workspaceHtml?: string | null,
+): string | null {
+  // Workspace HTML from OpenClaw agent takes priority (real file written to disk)
+  if (workspaceHtml) return workspaceHtml;
+  // Then check the latest HTML code block from messages
   for (let i = codeBlocks.length - 1; i >= 0; i--) {
     const block = codeBlocks[i];
     if (block.language === "html" || block.code.includes("<!DOCTYPE") || block.code.includes("<html")) {
@@ -115,7 +122,7 @@ function HtmlPreview({ html }: { html: string }) {
   );
 }
 
-export function PreviewPanel({ files, messages }: PreviewPanelProps) {
+export function PreviewPanel({ files, messages, workspaceHtml }: PreviewPanelProps) {
   const [selectedFile, setSelectedFile] = useState<GeneratedFile | null>(null);
   const [selectedCode, setSelectedCode] = useState<ExtractedCode | null>(null);
   const [activeTab, setActiveTab] = useState("preview");
@@ -133,7 +140,10 @@ export function PreviewPanel({ files, messages }: PreviewPanelProps) {
   const codeBlocks = useMemo(() => extractCodeBlocks(messages), [messages]);
 
   // Find previewable HTML
-  const previewHtml = useMemo(() => findPreviewableHtml(codeBlocks, files), [codeBlocks, files]);
+  const previewHtml = useMemo(
+    () => findPreviewableHtml(codeBlocks, files, workspaceHtml),
+    [codeBlocks, files, workspaceHtml],
+  );
 
   // Auto-switch to preview tab when HTML appears
   const prevHtmlRef = useRef<string | null>(null);
