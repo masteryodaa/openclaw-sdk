@@ -15,7 +15,11 @@ class GatewayProtocol(Protocol):
     """
 
     async def call(
-        self, method: str, params: dict[str, Any] | None = None
+        self,
+        method: str,
+        params: dict[str, Any] | None = None,
+        *,
+        timeout: float | None = None,
     ) -> dict[str, Any]: ...
 
     async def subscribe(
@@ -50,7 +54,11 @@ class Gateway(ABC):
 
     @abstractmethod
     async def call(
-        self, method: str, params: dict[str, Any] | None = None
+        self,
+        method: str,
+        params: dict[str, Any] | None = None,
+        *,
+        timeout: float | None = None,
     ) -> dict[str, Any]: ...
 
     @abstractmethod
@@ -100,13 +108,15 @@ class Gateway(ABC):
     # Agent run facade
     # ------------------------------------------------------------------ #
 
-    async def agent_wait(self, run_id: str) -> dict[str, Any]:
+    async def agent_wait(
+        self, run_id: str, *, timeout: float | None = None
+    ) -> dict[str, Any]:
         """Wait for an agent run to complete.
 
         Gateway method: ``agent.wait``
         Verified param: ``{runId}``
         """
-        return await self.call("agent.wait", {"runId": run_id})
+        return await self.call("agent.wait", {"runId": run_id}, timeout=timeout)
 
     # ------------------------------------------------------------------ #
     # Sessions admin facade
