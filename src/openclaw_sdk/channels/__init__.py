@@ -6,6 +6,11 @@ from openclaw_sdk.channels.config import (
     TelegramChannelConfig,
     WhatsAppChannelConfig,
 )
+from openclaw_sdk.channels.sms import (
+    SMSChannelConfig,
+    SMSMessage,
+    TwilioSMSClient,
+)
 
 __all__ = [
     "ChannelConfig",
@@ -14,4 +19,7 @@ __all__ = [
     "DiscordChannelConfig",
     "SlackChannelConfig",
     "GenericChannelConfig",
+    "SMSChannelConfig",
+    "SMSMessage",
+    "TwilioSMSClient",
 ]

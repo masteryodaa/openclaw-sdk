@@ -119,6 +119,20 @@ nav:
     - Prompt Versioning: guides/prompt-versioning.md
     - Multi-tenancy: guides/multitenancy.md
     - Framework Integrations: guides/integrations.md
+    - Plugins: guides/plugins.md
+    - Alerting: guides/alerting.md
+    - Audit Logging: guides/audit.md
+    - Billing: guides/billing.md
+    - Data Sources: guides/data-sources.md
+    - SaaS Connectors: guides/connectors.md
+    - SMS Channel: guides/sms-channel.md
+    - Deduplication & Semantic Cache: guides/deduplication.md
+    - Autonomous Agents: guides/autonomous.md
+    - Voice Pipeline: guides/voice.md
+    - Workflows: guides/workflows.md
+    - Webhooks: guides/webhooks.md
+    - Dashboard: guides/dashboard.md
+    - Command Center: guides/command-center.md
   - API Reference:
     - Client: api/client.md
     - Agent: api/agent.md
@@ -132,6 +146,15 @@ nav:
     - Callbacks: api/callbacks.md
     - Tools & MCP: api/tools.md
     - Evaluation & Tracing: api/evaluation.md
+    - Plugins & Alerting: api/plugins.md
+    - Audit & Billing: api/audit-billing.md
+    - Data Sources: api/data.md
+    - Connectors: api/connectors.md
+    - Autonomous Agents: api/autonomous.md
+    - Voice Pipeline: api/voice.md
+    - Workflows & Webhooks: api/workflows.md
+    - Resilience: api/resilience.md
+    - Dashboard: api/dashboard.md
   - Examples: examples/index.md
   - Changelog: changelog.md
 

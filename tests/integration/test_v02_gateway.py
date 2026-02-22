@@ -98,17 +98,21 @@ async def test_exec_approval_resolve_approve_decision(
 async def test_agent_wait_nonexistent_run(live_gateway: ProtocolGateway) -> None:
     """Calling agent.wait with a fake runId should return an error or timeout
     gracefully; the RPC itself must be routed correctly."""
+    from openclaw_sdk.core.exceptions import TimeoutError as OCTimeoutError
     fake_run_id = f"fake-run-{uuid.uuid4().hex[:12]}"
     try:
+        # We use a short timeout because agent.wait on a nonexistent run 
+        # is known to hang on some gateway versions.
         result = await live_gateway.call(
             "agent.wait",
             {"runId": fake_run_id},
+            timeout=2.0
         )
-        # If the gateway returns immediately for a non-existent run, check shape.
         assert isinstance(result, dict)
+    except OCTimeoutError:
+        # Timeout is acceptable for a non-existent run in this version
+        pass
     except GatewayError as exc:
-        # Gateway may reject an unknown runId — that is fine as long as we got
-        # a structured error response (proves the method exists).
         assert isinstance(exc.code, (str, type(None)))
 
 
@@ -170,11 +174,13 @@ async def test_facade_resolve_approval(live_gateway: ProtocolGateway) -> None:
 
 async def test_facade_agent_wait(live_gateway: ProtocolGateway) -> None:
     """Test the typed facade method agent_wait()."""
+    from openclaw_sdk.core.exceptions import TimeoutError as OCTimeoutError
     fake_run_id = f"facade-run-{uuid.uuid4().hex[:12]}"
     try:
-        result = await live_gateway.agent_wait(fake_run_id)
+        # Short timeout to avoid hanging on nonexistent runs
+        result = await live_gateway.agent_wait(fake_run_id, timeout=2.0)
         assert isinstance(result, dict)
-    except GatewayError:
+    except (GatewayError, OCTimeoutError):
         pass
 
 

@@ -9,7 +9,7 @@ hide:
 
 <span class="oc-mascot">🐸</span>
 
-<div class="oc-badge">v1.0 — Autonomous Agent SDK</div>
+<div class="oc-badge">v2.0 — Autonomous Agent SDK</div>
 
 # The Last Framework <span class="oc-glow">You'll Ever Need</span>
 
@@ -17,7 +17,7 @@ hide:
 
 <div class="oc-sub">
 Build AI agents that create their own tools, control computers, browse the web,
-and talk across 10+ messaging channels — all from Python. No chains. No boilerplate. Just vibes.
+and talk across 10+ messaging channels — all from Python. 225+ exports, 1299 tests, production-ready. No chains. No boilerplate. Just vibes.
 </div>
 
 <div class="oc-btns">
@@ -152,6 +152,78 @@ Regression-test your prompts with Contains, ExactMatch, Regex, Length evaluators
 ### Skills & ClawHub
 
 Browse, install, and manage skills from ClawHub marketplace. Agents discover and install skills during execution.
+
+</div>
+
+<div class="oc-card" markdown>
+<span class="oc-card-icon">🔌</span>
+
+### Plugins & Alerting
+
+Extend the SDK with plugins that hook into execution lifecycle. Monitor agents with alert rules, route to Slack, PagerDuty, or custom sinks.
+
+</div>
+
+<div class="oc-card" markdown>
+<span class="oc-card-icon">🎙️</span>
+
+### Voice Pipeline
+
+Speech-to-text and text-to-speech with Whisper, Deepgram, ElevenLabs, and OpenAI TTS. Full audio-in / audio-out agent workflows.
+
+</div>
+
+<div class="oc-card" markdown>
+<span class="oc-card-icon">🤖</span>
+
+### Autonomous Agents
+
+Goal-driven execution with multi-step planning, orchestration, budget limits, and a safety watchdog that can pause or kill runaway agents.
+
+</div>
+
+<div class="oc-card" markdown>
+<span class="oc-card-icon">🔄</span>
+
+### Workflows
+
+Branching state machines with conditions, approvals, and parallel steps. Built-in presets for code review, research, and support triage.
+
+</div>
+
+<div class="oc-card" markdown>
+<span class="oc-card-icon">🗄️</span>
+
+### Data Sources
+
+Unified async interface for SQLite, PostgreSQL, MySQL, and Supabase. Query databases from agents with type-safe results.
+
+</div>
+
+<div class="oc-card" markdown>
+<span class="oc-card-icon">🔗</span>
+
+### SaaS Connectors
+
+Pre-built integrations for GitHub, Slack, Notion, Jira, Stripe, Gmail, Google Sheets, HubSpot, Salesforce, and Zendesk.
+
+</div>
+
+<div class="oc-card" markdown>
+<span class="oc-card-icon">📊</span>
+
+### Dashboard
+
+Full-featured FastAPI dashboard with REST endpoints for agents, sessions, webhooks, workflows, audit logs, billing, and more.
+
+</div>
+
+<div class="oc-card" markdown>
+<span class="oc-card-icon">🛡️</span>
+
+### Resilience
+
+Retry with exponential backoff, circuit breakers, rate limiters, request deduplication, and semantic caching for robust gateway communication.
 
 </div>
 

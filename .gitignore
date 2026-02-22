@@ -34,9 +34,25 @@ docs-*.png
 # Scratch / temp files
 gen_tests.py
 old_plan.md
+test_attachment_types.py
 
 # Playwright MCP logs
 .playwright-mcp/
+
+# Screenshots (dev/testing/marketing — not project assets)
+*.png
+whatsapp-qr-login.png
+chat-*.png
+command-center-*.png
+
+# Generated marketing images
+openclaw-frog-pfp.png
+openclaw-pfp-uhd.png
+openclaw-x-pfp.png
+openclaw-x-cover.png
+x-post-*.png
+x-first-post.png
+langchain-ref.png
 
 # Internal development plans
 plans/

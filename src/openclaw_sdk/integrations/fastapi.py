@@ -180,7 +180,7 @@ def create_channel_router(
     @router.post("/{channel}/login/start")
     async def channel_login_start(channel: str) -> JSONResponse:
         try:
-            result = await client.channels.web_login_start(channel)
+            result = await client.channels.web_login_start()
         except OpenClawError as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
         return JSONResponse(content=result)
@@ -188,7 +188,7 @@ def create_channel_router(
     @router.post("/{channel}/login/wait")
     async def channel_login_wait(channel: str, timeout_ms: int = 60000) -> JSONResponse:
         try:
-            result = await client.channels.web_login_wait(channel, timeout_ms)
+            result = await client.channels.web_login_wait(timeout_ms=timeout_ms)
         except OpenClawError as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
         return JSONResponse(content=result)

@@ -18,15 +18,24 @@ from openclaw_sdk.core.exceptions import TimeoutError as OcTimeoutError
 from openclaw_sdk.core.types import (
     Attachment,
     ContentBlock,
+    ContentEvent,
+    DoneEvent,
+    ErrorEvent,
     ExecutionResult,
+    FileEvent,
     GeneratedFile,
     StreamEvent,
+    ThinkingEvent,
     TokenUsage,
     ToolCall,
+    ToolCallEvent,
+    ToolResultEvent,
+    TypedStreamEvent,
 )
 
 if TYPE_CHECKING:
     from openclaw_sdk.core.client import OpenClawClient
+    from openclaw_sdk.core.conversation import Conversation
     from openclaw_sdk.mcp.server import HttpMcpServer, StdioMcpServer
     from openclaw_sdk.skills.config import SkillEntry, SkillsConfig
     from openclaw_sdk.tools.policy import ToolPolicy
@@ -85,6 +94,9 @@ class Agent:
         self.agent_id = agent_id
         self.session_name = session_name
 
+    def __repr__(self) -> str:
+        return f"Agent(agent_id={self.agent_id!r}, session={self.session_name!r})"
+
     # ------------------------------------------------------------------ #
     # Properties
     # ------------------------------------------------------------------ #
@@ -93,6 +105,26 @@ class Agent:
     def session_key(self) -> str:
         """Gateway session key for this agent, e.g. ``"agent:main:main"``."""
         return f"agent:{self.agent_id}:{self.session_name}"
+
+    def conversation(self, session_name: str = "main") -> Conversation:
+        """Create a multi-turn :class:`Conversation` helper for this agent.
+
+        Args:
+            session_name: Session name for the conversation (default ``"main"``).
+
+        Returns:
+            A :class:`~openclaw_sdk.core.conversation.Conversation` instance.
+
+        Usage::
+
+            async with agent.conversation("session-1") as convo:
+                r1 = await convo.say("Hello")
+                r2 = await convo.say("Follow-up")
+                print(convo.turns)  # 2
+        """
+        from openclaw_sdk.core.conversation import Conversation as _Conv  # noqa: PLC0415
+
+        return _Conv(self, session_name)
 
     # ------------------------------------------------------------------ #
     # Params builder (shared by execute / execute_stream)
@@ -121,7 +153,11 @@ class Agent:
 
         if options:
             if options.thinking:
-                params["thinking"] = True
+                # Gateway expects a string: "enabled", "disabled", "auto", or budget
+                if isinstance(options.thinking, str):
+                    params["thinking"] = options.thinking
+                else:
+                    params["thinking"] = "enabled"
             if options.deliver is not None:
                 params["deliver"] = options.deliver
             params["timeoutMs"] = options.timeout_seconds * 1000
@@ -237,6 +273,279 @@ class Agent:
                 payload = event.data.get("payload") or {}
                 if payload.get("state") in ("final", "error", "aborted"):
                     break
+            if event.event_type == EventType.AGENT:
+                payload = event.data.get("payload") or {}
+                stream = payload.get("stream", "")
+                data = payload.get("data") or {}
+                if stream == "lifecycle" and data.get("phase") == "end":
+                    break
+                if stream == "lifecycle" and data.get("phase") == "error":
+                    break
+
+    async def stream_events(
+        self,
+        query: str,
+        *,
+        event_types: list[str] | None = None,
+        options: ExecutionOptions | None = None,
+    ) -> AsyncIterator[StreamEvent]:
+        """Yield filtered stream events from an agent execution.
+
+        Subscribes to gateway push events, sends ``chat.send``, and yields
+        :class:`~openclaw_sdk.core.types.StreamEvent` objects filtered by
+        the requested *event_types*.
+
+        Unlike :meth:`execute_stream` which yields all execution events and
+        stops at ``DONE``/``ERROR``, this method lets callers select only
+        specific event types (e.g. ``["content", "tool_call"]``) for typed
+        processing.
+
+        Args:
+            query: The message to send to the agent.
+            event_types: Optional list of event type strings to include.
+                If ``None``, all events are yielded.  Event types correspond
+                to :class:`~openclaw_sdk.core.constants.EventType` values
+                (e.g. ``"content"``, ``"tool_call"``, ``"done"``).
+            options: Optional execution controls (timeout, attachments, etc.).
+
+        Yields:
+            :class:`~openclaw_sdk.core.types.StreamEvent` objects matching
+            the requested event types, until a terminal event (``DONE`` or
+            ``ERROR``) is received.
+        """
+        params = self._build_send_params(query, options, None)
+
+        # Subscribe to all execution events so we can detect terminal ones
+        # regardless of the user-requested filter.
+        _EXEC_EVENTS = [
+            "agent", "chat", "content", "done", "error", "thinking",
+            "tool_call", "tool_result", "file_generated",
+        ]
+        subscriber = await self._client.gateway.subscribe(event_types=_EXEC_EVENTS)
+        await self._client.gateway.call("chat.send", params)
+
+        async for event in subscriber:
+            # Always break on terminal events.
+            is_terminal = event.event_type in (EventType.DONE, EventType.ERROR)
+            if event.event_type == EventType.CHAT:
+                payload = event.data.get("payload") or {}
+                if payload.get("state") in ("final", "error", "aborted"):
+                    is_terminal = True
+
+            # Yield only if the event matches the requested filter.
+            if event_types is None or event.event_type in event_types:
+                yield event
+
+            if is_terminal:
+                break
+
+    async def execute_stream_typed(
+        self,
+        query: str,
+        options: ExecutionOptions | None = None,
+        idempotency_key: str | None = None,
+    ) -> AsyncIterator[TypedStreamEvent]:
+        """Send *query* and yield strongly-typed events until completion.
+
+        Instead of raw :class:`StreamEvent` with untyped ``data`` dicts,
+        this method yields concrete subclasses of :class:`TypedStreamEvent`:
+
+        - :class:`ContentEvent` — text chunks
+        - :class:`ThinkingEvent` — reasoning chunks
+        - :class:`ToolCallEvent` — tool invocation
+        - :class:`ToolResultEvent` — tool output
+        - :class:`FileEvent` — generated files
+        - :class:`DoneEvent` — execution complete (terminal)
+        - :class:`ErrorEvent` — execution error (terminal)
+
+        Handles both real gateway events (``EventType.AGENT`` / ``EventType.CHAT``)
+        and MockGateway SDK-level events (``CONTENT``, ``DONE``, etc.) for
+        backward compatibility.
+
+        Example::
+
+            async for event in agent.execute_stream_typed("Hello"):
+                if isinstance(event, ContentEvent):
+                    print(event.text, end="")
+                elif isinstance(event, DoneEvent):
+                    print(f"\\nDone: {event.stop_reason}")
+
+        Yields:
+            :class:`TypedStreamEvent` subclass instances.
+        """
+        params = self._build_send_params(query, options, idempotency_key)
+
+        _EXEC_EVENTS = [
+            "agent", "chat", "content", "done", "error", "thinking",
+            "tool_call", "tool_result", "file_generated",
+        ]
+        subscriber = await self._client.gateway.subscribe(event_types=_EXEC_EVENTS)
+        await self._client.gateway.call("chat.send", params)
+
+        _pending_tool_name: str | None = None
+
+        async for event in subscriber:
+            payload = event.data.get("payload") or event.data
+
+            # ---- Real gateway: "agent" events (stream deltas) ----
+
+            if event.event_type == EventType.AGENT:
+                stream = payload.get("stream", "")
+                data = payload.get("data") or {}
+
+                if stream == "assistant":
+                    delta = data.get("delta") or data.get("text") or ""
+                    if delta:
+                        yield ContentEvent(text=delta)
+
+                elif stream == "thinking":
+                    chunk = data.get("text") or data.get("delta") or ""
+                    if chunk:
+                        yield ThinkingEvent(thinking=chunk)
+
+                elif stream == "tool":
+                    phase = data.get("phase", "")
+                    if phase == "call":
+                        tool_name = data.get("tool") or data.get("name") or ""
+                        tool_input = data.get("input") or ""
+                        if isinstance(tool_input, dict):
+                            tool_input = json.dumps(tool_input)
+                        _pending_tool_name = tool_name
+                        yield ToolCallEvent(tool=tool_name, input=tool_input)
+                    elif phase == "result":
+                        tool_output = data.get("output") or data.get("result") or ""
+                        if isinstance(tool_output, dict):
+                            tool_output = json.dumps(tool_output)
+                        yield ToolResultEvent(
+                            tool=_pending_tool_name or "",
+                            output=tool_output,
+                            duration_ms=data.get("durationMs", 0),
+                        )
+                        _pending_tool_name = None
+
+                elif stream == "file":
+                    yield FileEvent(
+                        name=data.get("name") or data.get("fileName") or "",
+                        path=data.get("path") or "",
+                        size_bytes=data.get("sizeBytes") or data.get("size") or 0,
+                        mime_type=(
+                            data.get("mimeType")
+                            or data.get("mime_type")
+                            or "application/octet-stream"
+                        ),
+                    )
+
+                elif stream == "lifecycle":
+                    phase = data.get("phase", "")
+                    if phase == "error":
+                        error_msg = data.get("error") or "Agent execution error"
+                        yield ErrorEvent(message=error_msg)
+                        break
+
+            # ---- Real gateway: "chat" events (state transitions) ----
+
+            elif event.event_type == EventType.CHAT:
+                state = payload.get("state", "")
+
+                if state == "delta":
+                    # Content comes via "agent" stream events; skip chat deltas
+                    # to avoid duplicating text.
+                    continue
+
+                elif state == "final":
+                    msg = payload.get("message") or {}
+                    raw_content = msg.get("content") or ""
+                    text, _blocks, _thinking = _parse_content(raw_content)
+
+                    # Token usage from message metadata
+                    usage_data = (
+                        msg.get("usage")
+                        or msg.get("tokenUsage")
+                        or payload.get("usage")
+                        or {}
+                    )
+                    token_usage = (
+                        TokenUsage.from_gateway(usage_data) if usage_data else TokenUsage()
+                    )
+
+                    stop_reason = (
+                        msg.get("stopReason")
+                        or payload.get("stopReason")
+                        or "complete"
+                    )
+                    yield DoneEvent(
+                        content=text,
+                        token_usage=token_usage,
+                        stop_reason=stop_reason,
+                    )
+                    break
+
+                elif state == "error":
+                    msg = payload.get("message") or {}
+                    error_msg = (
+                        msg.get("error")
+                        or payload.get("error")
+                        or "Agent reported an error"
+                    )
+                    yield ErrorEvent(message=error_msg)
+                    break
+
+                elif state == "aborted":
+                    yield DoneEvent(content="", stop_reason="aborted")
+                    break
+
+            # ---- MockGateway / SDK-level event types (backward compat) ----
+
+            elif event.event_type == EventType.CONTENT:
+                text = payload.get("content") or payload.get("text") or ""
+                yield ContentEvent(text=text)
+
+            elif event.event_type == EventType.THINKING:
+                thinking = payload.get("thinking") or payload.get("content") or ""
+                yield ThinkingEvent(thinking=thinking)
+
+            elif event.event_type == EventType.TOOL_CALL:
+                tool_name = payload.get("tool") or payload.get("name") or ""
+                tool_input = payload.get("input") or ""
+                if isinstance(tool_input, dict):
+                    tool_input = json.dumps(tool_input)
+                _pending_tool_name = tool_name
+                yield ToolCallEvent(tool=tool_name, input=tool_input)
+
+            elif event.event_type == EventType.TOOL_RESULT:
+                tool_output = payload.get("output") or payload.get("result") or ""
+                if isinstance(tool_output, dict):
+                    tool_output = json.dumps(tool_output)
+                yield ToolResultEvent(
+                    tool=_pending_tool_name or "",
+                    output=tool_output,
+                    duration_ms=payload.get("durationMs", 0),
+                )
+                _pending_tool_name = None
+
+            elif event.event_type == EventType.FILE_GENERATED:
+                yield FileEvent(
+                    name=payload.get("name") or payload.get("fileName") or "",
+                    path=payload.get("path") or "",
+                    size_bytes=payload.get("sizeBytes") or payload.get("size") or 0,
+                    mime_type=payload.get("mimeType") or "application/octet-stream",
+                )
+
+            elif event.event_type == EventType.DONE:
+                content = payload.get("content") or payload.get("text") or ""
+                usage_data = payload.get("usage") or payload.get("tokenUsage") or {}
+                token_usage = TokenUsage.from_gateway(usage_data) if usage_data else TokenUsage()
+                yield DoneEvent(
+                    content=content if isinstance(content, str) else "",
+                    token_usage=token_usage,
+                    stop_reason=payload.get("stopReason") or "complete",
+                )
+                break
+
+            elif event.event_type == EventType.ERROR:
+                msg = payload.get("message") or payload.get("error") or "Unknown error"
+                yield ErrorEvent(message=msg)
+                break
 
     async def batch(
         self,
@@ -593,6 +902,7 @@ class Agent:
         files: list[GeneratedFile] = []
         token_usage = TokenUsage()
         stop_reason: str | None = None
+        error_message: str | None = None
         success = True
 
         # Track pending tool call for pairing TOOL_CALL → TOOL_RESULT.
@@ -616,14 +926,26 @@ class Agent:
                         raw_content = msg.get("content") or ""
 
                         if state == "delta":
-                            text, blocks, thinking = _parse_content(raw_content)
-                            if text:
-                                content_parts.append(text)
-                            content_blocks.extend(blocks)
-                            thinking_parts.extend(thinking)
+                            # Skip — content is streamed via "agent" events.
+                            # Using chat deltas too would duplicate every chunk.
                             await cb.on_stream_event(self.agent_id, event)
 
                         elif state == "final":
+                            # Detect empty final: gateway sends state=final
+                            # with no "message" field when the LLM fails
+                            # (e.g. 429 rate-limit, auth error).  The error
+                            # details are stored in OpenClaw's session log
+                            # but not pushed through the gateway.
+                            if "message" not in payload and not content_parts:
+                                stop_reason = "error"
+                                error_message = (
+                                    "Agent completed with no response — "
+                                    "the LLM may be rate-limited or "
+                                    "unavailable (check OpenClaw logs)"
+                                )
+                                success = False
+                                break
+
                             # Final message — extract full content
                             text, blocks, thinking = _parse_content(raw_content)
                             # Replace accumulated deltas with the final text
@@ -865,5 +1187,6 @@ class Agent:
             files=files,
             token_usage=token_usage,
             stop_reason=stop_reason,
+            error_message=error_message,
             latency_ms=int((time.monotonic() - t0) * 1000),
         )

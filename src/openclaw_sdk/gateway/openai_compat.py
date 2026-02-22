@@ -147,6 +147,8 @@ class OpenAICompatGateway(Gateway):
         self,
         method: str,
         params: dict[str, Any] | None = None,
+        *,
+        timeout: float | None = None,
         **kwargs: Any,
     ) -> dict[str, Any]:
         """Translate an RPC-style method call to an HTTP request.
@@ -155,6 +157,8 @@ class OpenAICompatGateway(Gateway):
             method: RPC method name, e.g. ``"chat.send"`` or
                 ``"sessions.list"``.
             params: Request parameters / body.
+            timeout: Per-call timeout (unused; HTTP timeout is set at
+                client level).
 
         Returns:
             Parsed JSON response body as a dict.

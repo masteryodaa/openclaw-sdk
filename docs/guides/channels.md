@@ -30,11 +30,11 @@ asyncio.run(main())
 | Method | Description |
 |--------|-------------|
 | `status()` | Returns connection state for all channels |
-| `login(channel)` | Initiate login for a channel |
+| `login()` | Initiate QR login flow (returns QR data URL) |
 | `logout(channel)` | Disconnect and deauthorize a channel |
-| `web_login_start(channel)` | Start a web-based login flow (returns QR data) |
-| `web_login_wait(channel)` | Wait for the web login to complete |
-| `request_pairing_code(channel, phone)` | Request a pairing code (WhatsApp) |
+| `web_login_start()` | Start a web-based login flow (returns QR data) |
+| `web_login_wait(timeout_ms)` | Wait for the web login to complete |
+| `request_pairing_code(phone)` | Request a numeric pairing code |
 
 ## Channel Configurations
 
@@ -154,23 +154,23 @@ async def main():
     async with OpenClawClient.connect("ws://127.0.0.1:18789/gateway") as client:
         channels = client.channels
 
-        # Step 1: Start web login — returns QR code data
-        qr_data = await channels.web_login_start("whatsapp")
-        print(f"Scan this QR code: {qr_data.qr_url}")
+        # Step 1: Start web login — returns QR code data URL
+        qr_data = await channels.web_login_start()
+        print(f"Scan this QR code: {qr_data['qrDataUrl']}")
 
         # Step 2: Wait for the user to scan
-        result = await channels.web_login_wait("whatsapp")
-        if result.success:
+        result = await channels.web_login_wait()
+        if result.get("connected"):
             print("WhatsApp connected successfully!")
         else:
-            print(f"Login failed: {result.error}")
+            print(f"Status: {result.get('message')}")
 
 asyncio.run(main())
 ```
 
 !!! tip
     For headless environments where QR scanning is impractical, use the pairing
-    code flow instead: `channels.request_pairing_code("whatsapp", "+1234567890")`.
+    code flow instead: `channels.request_pairing_code(phone="+1234567890")`.
 
 ## Pairing Code Flow
 
@@ -184,13 +184,13 @@ async def main():
     async with OpenClawClient.connect("ws://127.0.0.1:18789/gateway") as client:
         channels = client.channels
 
-        # Request a pairing code sent to the phone
-        code = await channels.request_pairing_code("whatsapp", "+1234567890")
-        print(f"Enter this code on your phone: {code.pairing_code}")
+        # Request a pairing code
+        code = await channels.request_pairing_code(phone="+1234567890")
+        print(f"Enter this code on your phone: {code['pairingCode']}")
 
         # Wait for pairing to complete
-        result = await channels.web_login_wait("whatsapp")
-        print(f"Connected: {result.success}")
+        result = await channels.web_login_wait()
+        print(f"Connected: {result.get('connected')}")
 
 asyncio.run(main())
 ```
@@ -225,10 +225,10 @@ async def main():
             )
         )
 
-        # Login to both channels
+        # Login (starts QR flow for the configured web-login channel)
         channels = client.channels
-        await channels.login("support-bot")
-        await channels.login("dev-bot")
+        qr = await channels.login()
+        print(f"Scan QR code to link: {qr['qrDataUrl'][:50]}...")
 
         # Verify status
         status = await channels.status()

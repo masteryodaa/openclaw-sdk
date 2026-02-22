@@ -4,6 +4,7 @@ from typing import Any, AsyncIterator
 
 from openclaw_sdk.core.types import HealthStatus, StreamEvent
 from openclaw_sdk.gateway.base import Gateway
+from openclaw_sdk.resilience.retry import RetryPolicy
 
 # LocalGateway will auto-detect and connect to a running local OpenClaw instance.
 # Implemented in MD3A after protocol research is validated.
@@ -19,15 +20,21 @@ class LocalGateway(Gateway):
     This gateway wraps ProtocolGateway after detecting that OpenClaw is running.
     """
 
-    def __init__(self, ws_url: str = DEFAULT_WS_URL) -> None:
+    def __init__(
+        self,
+        ws_url: str = DEFAULT_WS_URL,
+        *,
+        retry_policy: RetryPolicy | None = None,
+    ) -> None:
         self._ws_url = ws_url
+        self._retry_policy = retry_policy
         self._inner: Gateway | None = None
 
     async def connect(self) -> None:
         # Implemented in MD3A — imports ProtocolGateway here to avoid circular deps
         from openclaw_sdk.gateway.protocol import ProtocolGateway  # noqa: PLC0415
 
-        self._inner = ProtocolGateway(self._ws_url)
+        self._inner = ProtocolGateway(self._ws_url, retry_policy=self._retry_policy)
         await self._inner.connect()
 
     async def close(self) -> None:
@@ -40,11 +47,15 @@ class LocalGateway(Gateway):
         return await self._inner.health()
 
     async def call(
-        self, method: str, params: dict[str, Any] | None = None
+        self,
+        method: str,
+        params: dict[str, Any] | None = None,
+        *,
+        timeout: float | None = None,
     ) -> dict[str, Any]:
         if self._inner is None:
             raise RuntimeError("LocalGateway not connected.")
-        return await self._inner.call(method, params)
+        return await self._inner.call(method, params, timeout=timeout)
 
     async def subscribe(
         self, event_types: list[str] | None = None

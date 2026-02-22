@@ -6,6 +6,9 @@ import pytest
 from openclaw_sdk.core.exceptions import (
     AgentExecutionError,
     AgentNotFoundError,
+    APIConnectionError,
+    APITimeoutError,
+    AuthenticationError,
     CallbackError,
     ChannelError,
     ConfigurationError,
@@ -13,6 +16,7 @@ from openclaw_sdk.core.exceptions import (
     OpenClawError,
     OutputParsingError,
     PipelineError,
+    RateLimitError,
     ScheduleError,
     SkillError,
     SkillNotFoundError,
@@ -284,7 +288,152 @@ def test_all_subclasses_are_openclaw_errors() -> None:
         PipelineError("x"),
         OutputParsingError("x"),
         CallbackError("x"),
+        RateLimitError("x"),
+        AuthenticationError("x"),
+        APITimeoutError("x"),
+        APIConnectionError("x"),
     ]
     for exc in subclasses:
         assert isinstance(exc, OpenClawError), f"{type(exc).__name__} is not an OpenClawError"
         assert isinstance(exc, Exception), f"{type(exc).__name__} is not an Exception"
+
+
+# ---------------------------------------------------------------------------
+# Retryability metadata — base class defaults
+# ---------------------------------------------------------------------------
+
+
+def test_openclaw_error_default_not_retryable() -> None:
+    exc = OpenClawError("generic error")
+    assert exc.is_retryable is False
+
+
+def test_openclaw_error_default_status_code_none() -> None:
+    exc = OpenClawError("generic error")
+    assert exc.status_code is None
+
+
+def test_openclaw_error_default_retry_after_none() -> None:
+    exc = OpenClawError("generic error")
+    assert exc.retry_after is None
+
+
+# ---------------------------------------------------------------------------
+# RateLimitError — retryable, inherits GatewayError
+# ---------------------------------------------------------------------------
+
+
+def test_ratelimit_is_retryable() -> None:
+    exc = RateLimitError("rate limited", status_code=429, retry_after=2.5)
+    assert exc.is_retryable is True
+
+
+def test_ratelimit_is_gateway_error() -> None:
+    exc = RateLimitError("rate limited")
+    assert isinstance(exc, GatewayError)
+    assert isinstance(exc, OpenClawError)
+
+
+def test_ratelimit_can_be_caught_as_gateway_error() -> None:
+    with pytest.raises(GatewayError):
+        raise RateLimitError("too many requests", status_code=429)
+
+
+# ---------------------------------------------------------------------------
+# AuthenticationError — NOT retryable, inherits GatewayError
+# ---------------------------------------------------------------------------
+
+
+def test_auth_error_not_retryable() -> None:
+    exc = AuthenticationError("invalid token", status_code=401)
+    assert exc.is_retryable is False
+
+
+def test_auth_error_is_gateway_error() -> None:
+    exc = AuthenticationError("forbidden", status_code=403)
+    assert isinstance(exc, GatewayError)
+    assert isinstance(exc, OpenClawError)
+
+
+# ---------------------------------------------------------------------------
+# APITimeoutError — retryable, inherits TimeoutError
+# ---------------------------------------------------------------------------
+
+
+def test_timeout_retryable() -> None:
+    exc = APITimeoutError("request timed out")
+    assert exc.is_retryable is True
+
+
+def test_api_timeout_is_timeout_error() -> None:
+    exc = APITimeoutError("deadline exceeded")
+    assert isinstance(exc, TimeoutError)
+    assert isinstance(exc, OpenClawError)
+
+
+# ---------------------------------------------------------------------------
+# APIConnectionError — retryable, inherits ConnectionError
+# ---------------------------------------------------------------------------
+
+
+def test_connection_retryable() -> None:
+    exc = APIConnectionError("connection refused")
+    assert exc.is_retryable is True
+
+
+def test_api_connection_is_connection_error() -> None:
+    exc = APIConnectionError("DNS resolution failed")
+    assert isinstance(exc, OcConnectionError)
+    assert isinstance(exc, OpenClawError)
+
+
+# ---------------------------------------------------------------------------
+# status_code and retry_after fields
+# ---------------------------------------------------------------------------
+
+
+def test_retry_after_field() -> None:
+    exc = RateLimitError("slow down", status_code=429, retry_after=30.0)
+    assert exc.retry_after == 30.0
+
+
+def test_status_code_field() -> None:
+    exc = AuthenticationError("unauthorized", status_code=401)
+    assert exc.status_code == 401
+
+
+def test_status_code_propagates_through_hierarchy() -> None:
+    exc = GatewayError("server error", status_code=500)
+    assert exc.status_code == 500
+    assert exc.is_retryable is False
+
+
+def test_retry_after_on_base_class() -> None:
+    exc = OpenClawError("err", retry_after=5.0)
+    assert exc.retry_after == 5.0
+    assert exc.is_retryable is False
+
+
+def test_existing_subclasses_default_not_retryable() -> None:
+    """Verify that the original subclasses (without overrides) remain non-retryable."""
+    non_retryable = [
+        ConfigurationError("x"),
+        GatewayError("x"),
+        AgentNotFoundError("x"),
+        AgentExecutionError("x"),
+        TimeoutError("x"),
+        StreamError("x"),
+        ChannelError("x"),
+        SkillError("x"),
+        SkillNotFoundError("x"),
+        WebhookError("x"),
+        ScheduleError("x"),
+        PipelineError("x"),
+        OutputParsingError("x"),
+        CallbackError("x"),
+        OcConnectionError("x"),
+    ]
+    for exc in non_retryable:
+        assert exc.is_retryable is False, (
+            f"{type(exc).__name__}.is_retryable should be False"
+        )

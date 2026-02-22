@@ -16,8 +16,10 @@ from websockets.asyncio.client import ClientConnection, connect as ws_connect
 
 from openclaw_sdk.core.constants import EventType as _EventType
 from openclaw_sdk.core.exceptions import GatewayError
+from openclaw_sdk.core.exceptions import TimeoutError as OCTimeoutError
 from openclaw_sdk.core.types import HealthStatus, StreamEvent
 from openclaw_sdk.gateway.base import Gateway
+from openclaw_sdk.resilience.retry import RetryPolicy
 
 logger = logging.getLogger(__name__)
 
@@ -180,10 +182,14 @@ class ProtocolGateway(Gateway):
         token: str | None = None,
         *,
         connect_timeout: float = 10.0,
+        default_timeout: float = 30.0,
+        retry_policy: RetryPolicy | None = None,
     ) -> None:
         self._ws_url = ws_url
         self._token: str | None = token  # may be None; resolved lazily in _do_connect
         self._connect_timeout = connect_timeout
+        self._default_timeout = default_timeout
+        self._retry_policy = retry_policy
 
         self._ws: ClientConnection | None = None
         self._reader_task: asyncio.Task[None] | None = None
@@ -558,30 +564,18 @@ class ProtocolGateway(Gateway):
         except GatewayError as exc:
             return HealthStatus(healthy=False, details={"error": str(exc)})
 
-    async def call(
+    async def _call_once(
         self,
         method: str,
-        params: dict[str, Any] | None = None,
-        *,
-        idempotency_key: str | None = None,
-        **kwargs: Any,
+        params: dict[str, Any] | None,
+        idempotency_key: str | None,
+        timeout: float | None = None,
     ) -> dict[str, Any]:
-        """Send an RPC request and await the response.
-
-        Args:
-            method: Gateway method name, e.g. ``"sessions.list"``.
-            params: Method parameters.  Defaults to ``{}``.
-            idempotency_key: Optional idempotency key passed through to the
-                gateway as ``idempotencyKey`` in the params dict.
-
-        Returns:
-            The ``result`` dict from the gateway response.
-
-        Raises:
-            GatewayError: On protocol error or gateway-reported error.
-        """
+        """Send a single RPC request and await the response (no retry)."""
         if not self._connected:
             raise GatewayError("Not connected to gateway. Call await gw.connect() first.")
+
+        effective_timeout = timeout if timeout is not None else self._default_timeout
 
         req_id = self._next_id()
         envelope: dict[str, Any] = {
@@ -605,11 +599,52 @@ class ProtocolGateway(Gateway):
             raise GatewayError(f"Failed to send request: {exc}") from exc
 
         try:
-            return await future
+            return await asyncio.wait_for(future, timeout=effective_timeout)
+        except asyncio.TimeoutError as exc:
+            self._pending.pop(req_id, None)
+            raise OCTimeoutError(
+                f"Gateway call '{method}' timed out after {effective_timeout}s"
+            ) from exc
         except GatewayError:
             raise
         except Exception as exc:
             raise GatewayError(f"Unexpected error awaiting response: {exc}") from exc
+
+    async def call(
+        self,
+        method: str,
+        params: dict[str, Any] | None = None,
+        *,
+        timeout: float | None = None,
+        idempotency_key: str | None = None,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """Send an RPC request and await the response.
+
+        When a :class:`~openclaw_sdk.resilience.retry.RetryPolicy` is
+        configured, transient failures are retried automatically with
+        exponential backoff.
+
+        Args:
+            method: Gateway method name, e.g. ``"sessions.list"``.
+            params: Method parameters.  Defaults to ``{}``.
+            timeout: Per-call timeout in seconds.  If ``None``, uses the
+                instance ``default_timeout`` (default 30 s).
+            idempotency_key: Optional idempotency key passed through to the
+                gateway as ``idempotencyKey`` in the params dict.
+
+        Returns:
+            The ``result`` dict from the gateway response.
+
+        Raises:
+            GatewayError: On protocol error or gateway-reported error.
+            TimeoutError: If the gateway does not respond within *timeout*.
+        """
+        if self._retry_policy is not None:
+            return await self._retry_policy.execute(
+                self._call_once, method, params, idempotency_key, timeout
+            )
+        return await self._call_once(method, params, idempotency_key, timeout)
 
     async def subscribe(
         self, event_types: list[str] | None = None

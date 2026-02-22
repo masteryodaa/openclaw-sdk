@@ -47,6 +47,7 @@ class ChannelType(StrEnum):
     SLACK = "slack"
     SIGNAL = "signal"
     IMESSAGE = "imessage"
+    SMS = "sms"
     TEAMS = "teams"
     GOOGLE_CHAT = "google_chat"
     MATRIX = "matrix"

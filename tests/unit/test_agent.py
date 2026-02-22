@@ -304,3 +304,117 @@ async def test_execute_accepts_execution_options() -> None:
     result = await agent.execute("query", options=options)
     assert result.success is True
     await client.close()
+
+
+# ---------------------------------------------------------------------------
+# execute() — empty final detection (LLM error propagation)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_execute_empty_final_sets_error() -> None:
+    """Gateway sends chat state=final with no 'message' field when LLM fails.
+
+    The SDK should detect this and set success=False with an error_message.
+    """
+    client = await _make_connected_client()
+    mock = _get_mock(client)
+
+    mock.register("chat.send", {"runId": "r-empty", "status": "started"})
+    # Simulate what the real gateway sends when LLM is rate-limited:
+    # state=final but no "message" field in the payload.
+    mock.emit_event(
+        StreamEvent(
+            event_type=EventType.CHAT,
+            data={"payload": {"runId": "r-empty", "state": "final"}},
+        )
+    )
+
+    agent = client.get_agent("rate-limited-bot")
+    result = await agent.execute("hello")
+
+    assert result.success is False
+    assert result.stop_reason == "error"
+    assert result.error_message is not None
+    assert "no response" in result.error_message.lower()
+    assert result.content == ""
+    await client.close()
+
+
+@pytest.mark.asyncio
+async def test_execute_normal_final_still_works() -> None:
+    """Normal chat state=final with a message field should work as before."""
+    client = await _make_connected_client()
+    mock = _get_mock(client)
+
+    mock.register("chat.send", {"runId": "r-ok", "status": "started"})
+    mock.emit_event(
+        StreamEvent(
+            event_type=EventType.CHAT,
+            data={
+                "payload": {
+                    "runId": "r-ok",
+                    "state": "final",
+                    "message": {
+                        "content": "All good!",
+                        "stopReason": "complete",
+                    },
+                }
+            },
+        )
+    )
+
+    agent = client.get_agent("healthy-bot")
+    result = await agent.execute("hi")
+
+    assert result.success is True
+    assert result.content == "All good!"
+    assert result.stop_reason == "complete"
+    assert result.error_message is None
+    await client.close()
+
+
+@pytest.mark.asyncio
+async def test_execute_aborted_state() -> None:
+    """Chat state=aborted should set success=False and stop_reason=aborted."""
+    client = await _make_connected_client()
+    mock = _get_mock(client)
+
+    mock.register("chat.send", {"runId": "r-abort", "status": "started"})
+    mock.emit_event(
+        StreamEvent(
+            event_type=EventType.CHAT,
+            data={"payload": {"runId": "r-abort", "state": "aborted"}},
+        )
+    )
+
+    agent = client.get_agent("aborted-bot")
+    result = await agent.execute("do stuff")
+
+    assert result.success is False
+    assert result.stop_reason == "aborted"
+    await client.close()
+
+
+# ---------------------------------------------------------------------------
+# ExecutionResult.error_message field
+# ---------------------------------------------------------------------------
+
+
+def test_execution_result_error_message_default() -> None:
+    """error_message defaults to None."""
+    result = ExecutionResult(success=True, content="hello")
+    assert result.error_message is None
+
+
+def test_execution_result_error_message_set() -> None:
+    """error_message can be explicitly set."""
+    result = ExecutionResult(
+        success=False,
+        content="",
+        error_message="LLM rate-limited",
+        stop_reason="error",
+    )
+    assert result.error_message == "LLM rate-limited"
+    assert result.success is False
+    assert result.stop_reason == "error"

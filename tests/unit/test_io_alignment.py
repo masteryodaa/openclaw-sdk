@@ -37,26 +37,22 @@ class TestAttachmentToGateway:
         decoded = base64.b64decode(result["content"])
         assert decoded[:4] == b"\xff\xd8\xff\xe0"
 
-    def test_validates_size(self, tmp_path: Path) -> None:
+    def test_no_size_limit(self, tmp_path: Path) -> None:
+        """SDK does not impose size limits — gateway is the authority."""
         big = tmp_path / "big.png"
-        big.write_bytes(b"\x00" * (26 * 1024 * 1024))  # 26MB > 25MB default
+        big.write_bytes(b"\x00" * (2 * 1024 * 1024))  # 2MB — no rejection
         att = Attachment(file_path=str(big), mime_type="image/png")
-        with pytest.raises(ValueError, match="25.*MB"):
-            att.to_gateway()
+        result = att.to_gateway()
+        assert result["mimeType"] == "image/png"
+        assert len(result["content"]) > 0
 
-    def test_validates_size_custom_limit(self, tmp_path: Path) -> None:
-        big = tmp_path / "big.png"
-        big.write_bytes(b"\x00" * (6 * 1024 * 1024))  # 6MB
-        att = Attachment(file_path=str(big), mime_type="image/png", max_size_bytes=5 * 1024 * 1024)
-        with pytest.raises(ValueError, match="5.*MB"):
-            att.to_gateway()
-
-    def test_validates_mime_type(self, tmp_path: Path) -> None:
+    def test_any_mime_type(self, tmp_path: Path) -> None:
+        """SDK accepts any MIME type — gateway is the authority."""
         f = tmp_path / "doc.xyz"
         f.write_bytes(b"Unknown content")
         att = Attachment(file_path=str(f), mime_type="application/x-unknown")
-        with pytest.raises(ValueError, match="mime"):
-            att.to_gateway()
+        result = att.to_gateway()
+        assert result["mimeType"] == "application/x-unknown"
 
     def test_accepts_pdf(self, tmp_path: Path) -> None:
         f = tmp_path / "doc.pdf"
@@ -302,7 +298,31 @@ class TestChatSendParams:
         for method, params in mock.calls:
             if method == "chat.send":
                 assert params is not None
-                assert params["thinking"] is True
+                assert params["thinking"] == "enabled"
+                break
+        else:
+            pytest.fail("chat.send not called")
+
+    async def test_sends_thinking_string_param(self) -> None:
+        """String thinking values pass through directly."""
+        mock = MockGateway()
+        await mock.connect()
+        mock.register("chat.send", {"runId": "r1", "status": "started"})
+        mock.emit_event(
+            StreamEvent(
+                event_type=EventType.DONE,
+                data={"payload": {"content": "result"}},
+            )
+        )
+        client = OpenClawClient(config=ClientConfig(), gateway=mock)
+        agent = client.get_agent("test")
+        options = ExecutionOptions(thinking="10000")
+        await agent.execute("think about this", options=options)
+
+        for method, params in mock.calls:
+            if method == "chat.send":
+                assert params is not None
+                assert params["thinking"] == "10000"
                 break
         else:
             pytest.fail("chat.send not called")

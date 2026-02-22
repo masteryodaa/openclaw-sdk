@@ -79,6 +79,12 @@ class OpenClawClient:
         self._ops: OpsManager | None = None
         self._devices: DeviceManager | None = None
 
+    def __repr__(self) -> str:
+        connected = getattr(self._gateway, "_connected", False)
+        return (
+            f"OpenClawClient(mode={self._config.mode!r}, connected={connected})"
+        )
+
     # ------------------------------------------------------------------ #
     # Factory
     # ------------------------------------------------------------------ #
@@ -109,7 +115,12 @@ class OpenClawClient:
         config_kwargs = {k: v for k, v in kwargs.items() if k in config_fields}
         callbacks: list[CallbackHandler] = kwargs.get("callbacks") or []
 
-        config = ClientConfig(**config_kwargs)
+        # When no config fields are passed, fall back to env vars.
+        if config_kwargs:
+            config = ClientConfig(**config_kwargs)
+        else:
+            config = ClientConfig.from_env()
+
         gateway = cls._build_gateway(config)
 
         await gateway.connect()
@@ -122,7 +133,11 @@ class OpenClawClient:
         if config.gateway_ws_url is not None:
             from openclaw_sdk.gateway.protocol import ProtocolGateway  # noqa: PLC0415
 
-            return ProtocolGateway(config.gateway_ws_url, token=config.api_key)
+            return ProtocolGateway(
+                config.gateway_ws_url,
+                token=config.api_key,
+                retry_policy=config.retry_policy,
+            )
 
         if config.openai_base_url is not None:
             from openclaw_sdk.gateway.openai_compat import OpenAICompatGateway  # noqa: PLC0415
@@ -132,7 +147,7 @@ class OpenClawClient:
         if config.mode == "local" or (config.mode == "auto" and _openclaw_is_running()):
             from openclaw_sdk.gateway.local import LocalGateway  # noqa: PLC0415
 
-            return LocalGateway()
+            return LocalGateway(retry_policy=config.retry_policy)
 
         raise ConfigurationError(
             "No OpenClaw gateway found. "

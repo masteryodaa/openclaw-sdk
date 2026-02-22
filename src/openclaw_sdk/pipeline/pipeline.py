@@ -46,6 +46,9 @@ class Pipeline:
         self._client = client
         self._steps: list[PipelineStep] = []
 
+    def __repr__(self) -> str:
+        return f"Pipeline(steps={len(self._steps)})"
+
     def add_step(
         self,
         name: str,

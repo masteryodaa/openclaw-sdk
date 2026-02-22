@@ -7,7 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [2.0.0] — 2026-02-22
+
+### Added — v2.0 Features (15 new modules)
+
+- **Request Deduplication** — `RequestDeduplicator` with SHA-256 fingerprinting, TTL expiry, LRU eviction, asyncio.Lock for concurrency safety
+- **Semantic Cache** — `SemanticCache(ResponseCache)` with cosine similarity matching, `EmbeddingProvider` ABC + `SimpleEmbeddingProvider` (stdlib) + `OpenAIEmbeddingProvider` (httpx); agent isolation, configurable threshold
+- **retry_async Decorator** — `RetryPolicy.as_decorator()` method and `retry_async()` convenience decorator factory; extends existing RetryPolicy
+- **Plugin System** — `Plugin` ABC with setup/teardown/hooks, `PluginRegistry` with manual registration + `importlib.metadata` entry-point discovery, `PluginHook` enum (6 hook types), `HookManager` for dispatch
+- **Alerting** — 4 alert rules (`CostThresholdRule`, `LatencyThresholdRule`, `ErrorRateRule`, `ConsecutiveFailureRule`), 5 sinks (`LogAlertSink`, `WebhookAlertSink`, `SlackAlertSink`, `PagerDutyAlertSink`, `EmailAlertSink`), `AlertManager` with per-rule cooldown
+- **Audit Logging** — `AuditEvent` model, 4 sinks (`InMemoryAuditSink` circular buffer, `FileAuditSink` JSONL with `asyncio.to_thread`, `StructlogAuditSink`, `HttpAuditSink`), `AuditLogger` with multi-sink dispatch and query/filter
+- **Billing** — `PricingTier`, `UsageRecord`, `BillingPeriod`, `Invoice`, `LineItem` models; `BillingManager` with usage recording, invoice generation, and JSON export
+- **SMS Channel** — `TwilioSMSClient` with httpx-based Twilio REST API, `SMSChannelConfig`, number allowlist, message truncation
+- **Data Sources** — `DataSource` ABC with connect/close/execute/list_tables/describe_table; `SQLiteDataSource` (zero-dep, asyncio.to_thread), `PostgresDataSource` (asyncpg), `MySQLDataSource` (aiomysql), `SupabaseDataSource` (httpx REST); `DataSourceRegistry`
+- **SaaS Connectors** — 10 real httpx connectors: `GitHubConnector`, `SlackConnector`, `GoogleSheetsConnector`, `GmailConnector`, `NotionConnector`, `JiraConnector`, `StripeConnector`, `HubSpotConnector`, `SalesforceConnector`, `ZendeskConnector`
+- **Autonomous Agents** — `Goal`/`GoalStatus` models, `Budget` with exhaustion tracking, `GoalLoop` for iterative execution, `Orchestrator` for multi-agent goal routing, `Watchdog` for safety constraints
+- **Voice Pipeline** — `STTProvider` ABC + `WhisperSTT` + `DeepgramSTT`; `TTSProvider` ABC + `OpenAITTS` + `ElevenLabsTTS`; `VoicePipeline` (audio → STT → agent → TTS → audio)
+- **Workflow Engine** — `Workflow` branching state machine with `StepType` (AGENT/CONDITION/APPROVAL/TRANSFORM); 3 presets (`review_workflow`, `research_workflow`, `support_workflow`); complements existing Pipeline
+- **Webhooks Rewrite** — replaced stub with full `WebhookManager`: HMAC-SHA256 signing, `WebhookDeliveryEngine` with retry + backoff, `WebhookDelivery` tracking, event filtering
+- **Dashboard Backend** — `create_dashboard_app()` FastAPI factory with 13 routers (health, agents, sessions, config, metrics, webhooks, workflows, audit, billing, templates, connectors, schedules, channels); 25+ REST endpoints
+
+### Added — Exception Classes
+- 10 new exception types: `DataSourceError`, `ConnectorError`, `VoiceError`, `WorkflowError`, `AuditError`, `AlertError`, `BillingError`, `DashboardError`, `PluginError`, `AutonomousError`
+
+### Changed
+- Public API surface expanded from 120 to 225 symbols
+- Version bump from 1.1.0 to 2.0.0
+- Test suite expanded from 942 to 1299 tests
+- mypy coverage expanded from 92 to 159 source files
+
+---
+
+## [1.1.0] — 2026-02-22
+
+### Added — SDK Improvements
+- **Structured errors with retryability** — `is_retryable` property, `status_code`, `retry_after` on base `OpenClawError`; new `RateLimitError`, `AuthenticationError`, `APITimeoutError`, `APIConnectionError` subclasses
+- **RetryPolicy** — exponential backoff with jitter, configurable `max_retries`, `backoff_base`, `backoff_max`; respects `is_retryable` overrides; integrates with `ProtocolGateway` and `ClientConfig`
+- **Environment variable config** — `ClientConfig.from_env()` reads `OPENCLAW_GATEWAY_URL`, `OPENCLAW_API_KEY`, `OPENCLAW_MODE`, `OPENCLAW_TIMEOUT`, `OPENCLAW_LOG_LEVEL`; `OpenClawClient.connect()` auto-reads env when no kwargs
+- **Per-call timeout** — `gateway.call(method, params, timeout=)` with configurable `default_timeout` on `ProtocolGateway`; raises `TimeoutError` on expiry
+- **Conversation helper** — `agent.conversation(session_name)` async context manager for multi-turn chat; `.say()`, `.get_history()`, `.reset()`, `.turns`, `.history`
+- **`__repr__` methods** — useful repr on `Agent`, `OpenClawClient`, `Pipeline`
+- **Model/provider switching API** — `ConfigManager.get_agent_model()`, `.set_agent_model()`, `.available_providers()`, `.available_models()`; `KNOWN_PROVIDERS` dict with Anthropic/OpenAI/Gemini/Ollama models
+- **Circuit breaker** — `CircuitBreaker` with closed/open/half-open states, configurable `failure_threshold`, `recovery_timeout`, `half_open_max_calls`; `CircuitOpenError` exception
+- **Rate limiter** — `RateLimiter` with sliding window, configurable `max_calls`, `period`; async `acquire()` and `execute()` methods
+- **OpenTelemetry integration** — `OTelCallbackHandler` creates spans for agent executions and tool calls; records token usage, latency, errors; graceful no-op when `opentelemetry-api` not installed
+- **Typed streaming** — `agent.execute_stream_typed()` yields strongly-typed events (`ContentEvent`, `ThinkingEvent`, `ToolCallEvent`, `ToolResultEvent`, `FileEvent`, `DoneEvent`, `ErrorEvent`) instead of raw `StreamEvent` dicts; enables `isinstance()` pattern matching
+
+### Added — Command Center v3.0
+- **65+ API endpoints** across 12 route modules (up from 41)
+- **10-tab web UI**: Chat, Sessions, Models, Pipelines, Guardrails, Observe, Config, Channels, Schedules, System
+- **Models tab** — runtime LLM provider/model switching per agent with known providers + custom support
+- **Pipelines tab** — multi-step pipeline builder, supervisor patterns, keyword router, batch execution, agent templates
+- **Guardrails tab** — safety checks (PII, keyword, regex, length), agent evaluation with test cases
+- **Observe tab** — cost tracking dashboard (totals, per-agent, entries), prompt versioning with save/list/rollback
+- **Agent introspection** — Info/History buttons: detailed status, sessions, memory, model info, conversation history
+
+### Fixed — LLM Error Propagation
+- **Empty-final detection** — gateway sends `chat state=final` with no `message` field when the LLM fails (e.g. 429 rate-limit, auth error); SDK now detects this and returns `success=False` with `stop_reason="error"` and a descriptive `error_message`
+- **`ExecutionResult.error_message`** — new field (defaults to `None`) that carries error details when the agent or LLM fails, instead of silently returning empty content
+- **Aborted state** — `chat state=aborted` now correctly sets `success=False` with `stop_reason="aborted"`
 
 ### Fixed — Gateway Protocol (E2E Verified)
 - **Auth handshake** — rewrote `ProtocolGateway._handle_challenge()` to use proper `connect` method RPC with Ed25519 device identity signatures (v2 payload format)

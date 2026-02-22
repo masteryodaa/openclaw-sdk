@@ -4,7 +4,7 @@ import base64
 import mimetypes
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -14,54 +14,29 @@ from openclaw_sdk.core.constants import AgentStatus, EventType
 class Attachment(BaseModel):
     """A file attachment sent with a query.
 
-    OpenClaw supports images, documents, audio, and video attachments.
-    Default maximum file size is 25 MB (configurable via ``max_size_bytes``).
+    The gateway accepts **any MIME type** and **any file size** within its
+    WebSocket frame limit.  The SDK does not impose its own restrictions —
+    the gateway is the authority.
 
-    Use :meth:`from_path` to create from a local file with auto-detected MIME type,
-    or construct directly with ``content_base64`` to skip file I/O.
+    **Verified against OpenClaw 2026.2.3-1 (2026-02-23):**
+
+    - All MIME types accepted (no server-side allowlist)
+    - Gateway ``maxPayload`` = 512 KiB per WS frame (~380 KB raw after
+      base64 + JSON overhead).  Oversized frames cause a WS disconnect
+      which surfaces as a connection error.
+
+    Use :meth:`from_path` to create from a local file with auto-detected
+    MIME type, or construct directly with ``content_base64`` to skip file I/O.
     """
 
     file_path: str
     mime_type: str | None = None
     name: str | None = None
     content_base64: str | None = None
-    max_size_bytes: int | None = None
-
-    MAX_SIZE_BYTES: ClassVar[int] = 25 * 1024 * 1024
-    ALLOWED_MIME_TYPES: ClassVar[frozenset[str]] = frozenset({
-        # Images
-        "image/jpeg",
-        "image/png",
-        "image/gif",
-        "image/webp",
-        "image/svg+xml",
-        "image/heic",
-        # Documents
-        "application/pdf",
-        "text/plain",
-        "text/markdown",
-        "text/csv",
-        "application/json",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        # Audio
-        "audio/mpeg",
-        "audio/ogg",
-        "audio/wav",
-        "audio/webm",
-        "audio/mp4",
-        "audio/aac",
-        "audio/x-caf",
-        # Video
-        "video/mp4",
-        "video/webm",
-        "video/quicktime",
-    })
 
     def to_gateway(self) -> dict[str, Any]:
         """Serialize this attachment to the gateway ``chat.send`` payload format.
 
-        Validates file size and MIME type.
         If ``content_base64`` is set, uses it directly; otherwise reads
         ``file_path`` and base64-encodes its contents.
 
@@ -69,13 +44,10 @@ class Attachment(BaseModel):
             Dict with keys ``type``, ``mimeType``, ``fileName``, ``content``.
 
         Raises:
-            ValueError: If the file exceeds the size limit or has a disallowed MIME type.
+            ValueError: If the MIME type cannot be determined.
             FileNotFoundError: If ``file_path`` does not exist and no
                 ``content_base64`` was provided.
         """
-        limit = self.max_size_bytes if self.max_size_bytes is not None else self.MAX_SIZE_BYTES
-        limit_mb = limit / (1024 * 1024)
-
         # Resolve MIME type: explicit > guessed from extension
         resolved_mime = self.mime_type
         if resolved_mime is None:
@@ -88,30 +60,12 @@ class Attachment(BaseModel):
                 f"Please specify mime_type explicitly."
             )
 
-        if resolved_mime not in self.ALLOWED_MIME_TYPES:
-            raise ValueError(
-                f"Unsupported mime type '{resolved_mime}'. "
-                f"Allowed: {sorted(self.ALLOWED_MIME_TYPES)}"
-            )
-
         # Resolve content
         if self.content_base64 is not None:
             b64_content = self.content_base64
-            # Estimate raw size from base64 length (~4/3 inflation).
-            estimated_size = len(b64_content) * 3 // 4
-            if estimated_size > limit:
-                raise ValueError(
-                    f"content_base64 is approximately {estimated_size} bytes, "
-                    f"exceeding the {limit_mb:.0f} MB limit ({limit} bytes)."
-                )
         else:
             path = Path(self.file_path)
             raw = path.read_bytes()
-            if len(raw) > limit:
-                raise ValueError(
-                    f"File '{self.file_path}' is {len(raw)} bytes, "
-                    f"exceeding the {limit_mb:.0f} MB limit ({limit} bytes)."
-                )
             b64_content = base64.b64encode(raw).decode("ascii")
 
         # Resolve file name
@@ -223,6 +177,8 @@ class ExecutionResult(BaseModel):
     )
     stop_reason: str | None = None
     """Stop reason: ``"complete"``, ``"aborted"``, ``"error"``, ``"timeout"``."""
+    error_message: str | None = None
+    """Error details when the agent or LLM failed (e.g. rate-limit, auth error)."""
 
     @property
     def has_files(self) -> bool:
@@ -232,6 +188,78 @@ class ExecutionResult(BaseModel):
 class StreamEvent(BaseModel):
     event_type: EventType
     data: dict[str, Any]
+
+
+# ---------------------------------------------------------------------------
+# Typed stream events — strongly-typed alternatives to raw StreamEvent
+# ---------------------------------------------------------------------------
+
+
+class TypedStreamEvent(BaseModel):
+    """Base class for typed stream events.
+
+    Subclasses provide typed fields for each gateway event kind, replacing
+    the raw ``data: dict`` pattern.  Use with :meth:`Agent.execute_stream_typed`.
+    """
+
+    event_type: EventType
+
+
+class ContentEvent(TypedStreamEvent):
+    """A content chunk from the agent."""
+
+    event_type: EventType = EventType.CONTENT
+    text: str = ""
+
+
+class ThinkingEvent(TypedStreamEvent):
+    """A thinking/reasoning chunk from the agent."""
+
+    event_type: EventType = EventType.THINKING
+    thinking: str = ""
+
+
+class ToolCallEvent(TypedStreamEvent):
+    """The agent is invoking a tool."""
+
+    event_type: EventType = EventType.TOOL_CALL
+    tool: str = ""
+    input: str = ""
+
+
+class ToolResultEvent(TypedStreamEvent):
+    """The result from a tool invocation."""
+
+    event_type: EventType = EventType.TOOL_RESULT
+    tool: str = ""
+    output: str = ""
+    duration_ms: int = 0
+
+
+class FileEvent(TypedStreamEvent):
+    """A file generated by the agent."""
+
+    event_type: EventType = EventType.FILE_GENERATED
+    name: str = ""
+    path: str = ""
+    size_bytes: int = 0
+    mime_type: str = "application/octet-stream"
+
+
+class DoneEvent(TypedStreamEvent):
+    """Agent execution completed."""
+
+    event_type: EventType = EventType.DONE
+    content: str = ""
+    token_usage: TokenUsage = Field(default_factory=TokenUsage)
+    stop_reason: str = "complete"
+
+
+class ErrorEvent(TypedStreamEvent):
+    """Agent execution error."""
+
+    event_type: EventType = EventType.ERROR
+    message: str = ""
 
 
 class AgentSummary(BaseModel):
