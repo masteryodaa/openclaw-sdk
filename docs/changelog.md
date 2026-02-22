@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.0] — 2026-02-22
+
+### Added — New Modules
+- **Plugin System** — Hook dispatch and entry-point discovery for extensible SDK plugins
+- **Alerting** — Rule-based alerting with multiple sinks: webhook, Slack, PagerDuty, email, log
+- **Audit Logging** — Structured audit trail with pluggable sinks: in-memory, file, structlog, HTTP
+- **Billing** — Pricing tiers, usage record tracking, and invoice generation
+- **Data Sources** — Direct database connectivity: SQLite, PostgreSQL, MySQL, Supabase
+- **SaaS Connectors** — Pre-built integrations for GitHub, Slack, Google Sheets, Gmail, Notion, Jira, Stripe, HubSpot, Salesforce, Zendesk
+- **Voice Pipeline** — Speech-to-text and text-to-speech with provider support: Whisper, Deepgram, OpenAI TTS, ElevenLabs
+- **Autonomous Agents** — Goal loops, orchestrator, watchdog, and budget tracking for self-directed agent execution
+- **Workflow Engine** — Branching state machine with conditions, approvals, and transforms
+- **SMS Channel** — Twilio-based SMS channel for agent communication
+
+### Added — Command Center
+- **Web UI Dashboard** — Full-featured dashboard with 17 tabs for agent management and monitoring
+- **Chat Interface** — Streaming chat with event timeline and file attachment support
+- **Real-Time Monitoring** — Live agent monitoring with WebSocket-driven metrics
+
+### Enhanced
+- **Webhooks** — Rewritten with HMAC-SHA256 signing and delivery tracking
+- **Semantic Cache** — Embedding-based similarity matching for intelligent response caching
+- **Request Deduplication** — SHA-256 fingerprinting with TTL and LRU eviction
+- **Retry Decorator** — `retry_async()` utility added to complement existing `RetryPolicy`
+- **Dashboard Backend** — FastAPI application with 13 routers and WebSocket metrics streaming
+
+### Fixed
+- **Attachment model** — Removed artificial size and MIME-type limits; gateway is now the sole authority for validation
+- **WebSocket disconnect** — Graceful error recovery on unexpected WS disconnects
+
+### Stats
+- 1,298 tests, 159 source files `mypy` clean, `ruff` clean
+
+---
+
 ## [1.0.0] — 2026-02-21
 
 ### Added
@@ -81,6 +116,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 10 example scripts
 - `docs/quickstart.md`, `docs/protocol.md`
 
+[2.0.0]: https://github.com/openclaw-sdk/openclaw-sdk/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/openclaw-sdk/openclaw-sdk/compare/v0.2.0...v1.0.0
 [0.2.0]: https://github.com/openclaw-sdk/openclaw-sdk/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/openclaw-sdk/openclaw-sdk/releases/tag/v0.1.0

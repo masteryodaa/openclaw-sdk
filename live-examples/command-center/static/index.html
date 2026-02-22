@@ -1,0 +1,2566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenClaw Command Center</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐸</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #0a0f0d;
+  --bg2:      #111a16;
+  --bg3:      #162019;
+  --hover:    #1a2b22;
+  --border:   #1e3329;
+  --border2:  #2a4a3a;
+  --text:     #e8f0ec;
+  --text2:    #8fa89a;
+  --muted:    #5a7568;
+  --green:    #4ade80;
+  --green2:   #22c55e;
+  --glow:     rgba(74,222,128,.12);
+  --red:      #f87171;
+  --blue:     #60a5fa;
+  --purple:   #a78bfa;
+  --yellow:   #fbbf24;
+  --r: 8px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); height:100vh; overflow:hidden; display:flex; }
+
+/* ── Sidebar ── */
+.side { width:260px; min-width:260px; background:var(--bg2); border-right:1px solid var(--border); display:flex; flex-direction:column; }
+.side-head { padding:18px 18px 14px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px; }
+.logo { font-size:26px; }
+.brand { font-family:'JetBrains Mono',monospace; font-weight:700; font-size:14px; color:var(--green); }
+.brand small { display:block; font-weight:400; font-size:10px; color:var(--muted); margin-top:1px; }
+
+.status { padding:8px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px; font-size:11px; color:var(--text2); }
+.dot { width:7px; height:7px; border-radius:50%; background:var(--muted); flex-shrink:0; }
+.dot.on  { background:var(--green); box-shadow:0 0 6px var(--green); }
+.dot.off { background:var(--red); box-shadow:0 0 6px var(--red); }
+
+/* Nav tabs */
+.side-nav { padding:8px; border-bottom:1px solid var(--border); }
+.nav-item { padding:7px 10px; border-radius:var(--r); cursor:pointer; display:flex; align-items:center; gap:8px; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text2); margin-bottom:2px; border:1px solid transparent; transition:all .12s; }
+.nav-item:hover { background:var(--hover); color:var(--text); }
+.nav-item.on { background:var(--glow); border-color:var(--border2); color:var(--green); }
+.nav-icon { width:18px; text-align:center; font-size:13px; }
+
+.agents { flex:1; overflow-y:auto; padding:8px; }
+.agents-title { font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:1.5px; color:var(--muted); padding:4px 8px 8px; }
+
+.ag { padding:8px 10px; border-radius:var(--r); cursor:pointer; display:flex; align-items:center; gap:8px; margin-bottom:2px; border:1px solid transparent; transition:background .12s; }
+.ag:hover { background:var(--hover); }
+.ag.on { background:var(--glow); border-color:var(--border2); }
+.ag-icon { width:30px; height:30px; border-radius:var(--r); background:var(--bg3); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:14px; }
+.ag-name { font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:500; }
+.ag-status { font-size:10px; color:var(--muted); margin-top:1px; }
+.ag-actions { margin-left:auto; display:flex; gap:4px; opacity:0; transition:opacity .1s; }
+.ag:hover .ag-actions { opacity:1; }
+.ag-btn { background:none; border:none; color:var(--muted); cursor:pointer; font-size:11px; padding:2px; }
+.ag-btn:hover { color:var(--red); }
+
+.side-foot { padding:10px; border-top:1px solid var(--border); display:flex; gap:6px; }
+.sbtn { flex:1; padding:6px; background:var(--bg3); border:1px solid var(--border); border-radius:var(--r); color:var(--text2); font-family:'JetBrains Mono',monospace; font-size:10px; cursor:pointer; text-align:center; }
+.sbtn:hover { background:var(--hover); color:var(--text); }
+
+/* ── Main ── */
+.main { flex:1; display:flex; flex-direction:column; min-width:0; }
+
+/* Tab panels */
+.panel { display:none; flex:1; flex-direction:column; min-height:0; }
+.panel.active { display:flex; }
+
+/* ── Top bar ── */
+.topbar { padding:10px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; background:var(--bg2); }
+.topbar-left { display:flex; align-items:center; gap:8px; }
+.topbar-title { font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:600; }
+.badge { font-family:'JetBrains Mono',monospace; font-size:10px; padding:2px 7px; background:var(--bg3); border:1px solid var(--border); border-radius:4px; color:var(--muted); }
+.topbar-actions { display:flex; gap:6px; }
+.tbtn { padding:4px 10px; background:var(--bg3); border:1px solid var(--border); border-radius:var(--r); color:var(--text2); font-family:'JetBrains Mono',monospace; font-size:10px; cursor:pointer; }
+.tbtn:hover { background:var(--hover); color:var(--text); }
+.tbtn.danger:hover { color:var(--red); border-color:var(--red); }
+.tbtn.primary { background:var(--green2); border-color:var(--green2); color:var(--bg); }
+.tbtn.primary:hover { background:var(--green); }
+
+/* ── Chat ── */
+.chat { flex:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:12px; }
+
+.welcome { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; color:var(--muted); text-align:center; }
+.welcome-frog { font-size:52px; filter:drop-shadow(0 0 16px rgba(74,222,128,.2)); }
+.welcome h2 { font-family:'JetBrains Mono',monospace; font-size:16px; color:var(--text2); }
+.welcome p { font-size:13px; max-width:380px; line-height:1.6; }
+
+.msg { display:flex; gap:8px; max-width:82%; animation:fadeIn .2s ease; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+.msg.user { align-self:flex-end; flex-direction:row-reverse; }
+
+.avatar { width:28px; height:28px; border-radius:var(--r); background:var(--bg3); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0; }
+.msg.user .avatar { background:#1a2e1f; border-color:#2a4830; }
+
+.bubble { padding:9px 13px; border-radius:10px; font-size:13px; line-height:1.6; white-space:pre-wrap; word-wrap:break-word; }
+.msg.user .bubble { background:#1a2e1f; border:1px solid #2a4830; border-radius:10px 10px 3px 10px; }
+.msg.assistant .bubble { background:var(--bg2); border:1px solid var(--border); border-radius:10px 10px 10px 3px; }
+.bubble.error { border-color:var(--red); color:var(--red); }
+
+.meta { font-size:10px; color:var(--muted); margin-top:2px; padding:0 4px; font-family:'JetBrains Mono',monospace; }
+
+.thinking-box { margin-bottom:4px; padding:6px 10px; background:#1f1a2e; border:1px solid #3a2a58; border-radius:var(--r); font-size:11px; color:var(--text2); font-style:italic; }
+.thinking-box .label { font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:600; color:var(--purple); text-transform:uppercase; letter-spacing:1px; margin-bottom:2px; }
+
+.tool-box { margin-bottom:4px; padding:6px 10px; background:#1a1f2e; border:1px solid #2a3548; border-radius:var(--r); font-family:'JetBrains Mono',monospace; font-size:11px; }
+.tool-box .label { font-size:9px; font-weight:600; color:var(--blue); text-transform:uppercase; letter-spacing:1px; margin-bottom:2px; }
+.tool-box .output { margin-top:4px; padding-top:4px; border-top:1px solid #2a3548; color:var(--text2); max-height:160px; overflow-y:auto; white-space:pre-wrap; }
+
+.file-box { margin-bottom:4px; padding:6px 10px; background:#1f2a1a; border:1px solid #3a4828; border-radius:var(--r); font-family:'JetBrains Mono',monospace; font-size:11px; }
+.file-box .label { font-size:9px; font-weight:600; color:var(--green); text-transform:uppercase; letter-spacing:1px; margin-bottom:2px; }
+.file-box img { max-width:320px; max-height:240px; border-radius:6px; margin-top:4px; cursor:pointer; transition:transform .15s; }
+.file-box img:hover { transform:scale(1.02); }
+
+/* ── Tool call live status ── */
+.tool-box.running { border-color:var(--blue); animation:toolPulse 1.5s infinite; }
+.tool-box.done { border-color:#2a3548; }
+.tool-box .status-icon { float:right; font-size:11px; }
+@keyframes toolPulse { 0%,100%{border-color:#2a4568} 50%{border-color:var(--blue)} }
+
+/* ── Thinking toggle ── */
+.thinking-box { cursor:pointer; position:relative; }
+.thinking-box.collapsed .thinking-content { display:none; }
+.thinking-box .thinking-toggle { float:right; font-size:9px; color:var(--purple); opacity:.7; }
+.thinking-box .thinking-content { margin-top:4px; white-space:pre-wrap; }
+
+/* ── Attachment previews in user messages ── */
+.attachment-preview { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:4px; }
+.attachment-thumb { position:relative; border-radius:6px; overflow:hidden; border:1px solid var(--border); }
+.attachment-thumb img { max-width:120px; max-height:80px; display:block; }
+.attachment-thumb .att-name { font-size:9px; color:var(--muted); padding:2px 4px; background:var(--bg3); text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:120px; }
+.attachment-thumb .att-file { padding:8px 12px; background:var(--bg3); font-size:10px; color:var(--text2); font-family:'JetBrains Mono',monospace; display:flex; align-items:center; gap:4px; }
+
+/* ── Event timeline (live activity log) ── */
+.event-timeline { margin-bottom:6px; }
+.evt { display:flex; align-items:center; gap:6px; padding:2px 8px; font-size:10px; font-family:'JetBrains Mono',monospace; color:var(--muted); animation:fadeIn .15s ease; }
+.evt .evt-dot { width:5px; height:5px; border-radius:50%; flex-shrink:0; }
+.evt .evt-dot.thinking { background:var(--purple); }
+.evt .evt-dot.tool { background:var(--blue); }
+.evt .evt-dot.file { background:var(--green); }
+.evt .evt-dot.content { background:var(--text2); }
+.evt .evt-dot.done { background:var(--green); }
+.evt .evt-dot.error { background:var(--red); }
+.evt .evt-time { color:var(--muted); opacity:.6; }
+
+.cursor { display:inline-block; width:2px; height:14px; background:var(--green); animation:blink .7s infinite; vertical-align:text-bottom; margin-left:2px; }
+@keyframes blink { 0%,50%{opacity:1} 51%,100%{opacity:0} }
+
+/* ── Input ── */
+.input-area { padding:10px 20px 14px; border-top:1px solid var(--border); background:var(--bg2); }
+.input-row { display:flex; gap:6px; align-items:flex-end; }
+#msg-input { flex:1; padding:8px 12px; background:var(--bg3); border:1px solid var(--border); border-radius:10px; color:var(--text); font-family:'DM Sans',sans-serif; font-size:13px; resize:none; outline:none; min-height:38px; max-height:160px; line-height:1.5; }
+#msg-input:focus { border-color:var(--green2); }
+#msg-input::placeholder { color:var(--muted); }
+
+.send { width:38px; height:38px; background:var(--green2); border:none; border-radius:10px; color:var(--bg); font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.send:hover { background:var(--green); }
+.send:disabled { background:var(--bg3); color:var(--muted); cursor:not-allowed; }
+
+.attach-btn { width:38px; height:38px; background:var(--bg3); border:1px solid var(--border); border-radius:10px; color:var(--muted); font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:all .15s; }
+.attach-btn:hover { background:var(--bg); border-color:var(--green2); color:var(--green); }
+.attach-btn.has-files { background:#1a2e1f; border-color:var(--green2); color:var(--green); }
+
+.pending-attachments { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
+.pending-att { position:relative; border-radius:6px; overflow:hidden; border:1px solid var(--border); background:var(--bg3); }
+.pending-att img { max-width:60px; max-height:40px; display:block; }
+.pending-att .pa-info { padding:3px 6px; font-size:9px; color:var(--text2); max-width:80px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pending-att .pa-remove { position:absolute; top:-2px; right:-2px; width:14px; height:14px; background:var(--red); color:#fff; border:none; border-radius:50%; font-size:8px; cursor:pointer; display:flex; align-items:center; justify-content:center; line-height:1; }
+
+.opts { display:flex; gap:10px; margin-top:4px; padding:0 2px; align-items:center; flex-wrap:wrap; }
+.opt { display:flex; align-items:center; gap:4px; font-size:10px; color:var(--muted); cursor:pointer; }
+.opt input { accent-color:var(--green2); }
+
+/* ── Content panels ── */
+.panel-content { flex:1; overflow-y:auto; padding:20px; }
+.panel-content h3 { font-family:'JetBrains Mono',monospace; font-size:14px; margin-bottom:12px; color:var(--green); }
+
+.card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); padding:14px; margin-bottom:10px; }
+.card-title { font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:600; color:var(--text2); margin-bottom:8px; display:flex; align-items:center; justify-content:space-between; }
+
+.data-table { width:100%; border-collapse:collapse; font-size:12px; }
+.data-table th { text-align:left; padding:6px 8px; font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; border-bottom:1px solid var(--border); }
+.data-table td { padding:6px 8px; border-bottom:1px solid var(--border); color:var(--text2); font-family:'JetBrains Mono',monospace; font-size:11px; }
+.data-table tr:hover td { background:var(--hover); }
+
+.json-view { background:var(--bg); border:1px solid var(--border); border-radius:var(--r); padding:12px; font-family:'JetBrains Mono',monospace; font-size:11px; line-height:1.5; white-space:pre-wrap; overflow-x:auto; max-height:400px; overflow-y:auto; color:var(--text2); }
+
+.inline-form { display:flex; gap:6px; align-items:center; margin-bottom:10px; flex-wrap:wrap; }
+.inline-form input, .inline-form select, .inline-form textarea { padding:6px 10px; background:var(--bg3); border:1px solid var(--border); border-radius:var(--r); color:var(--text); font-family:'JetBrains Mono',monospace; font-size:11px; outline:none; }
+.inline-form input:focus, .inline-form textarea:focus { border-color:var(--green2); }
+
+.status-badge { display:inline-block; padding:2px 6px; border-radius:3px; font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:600; }
+.status-badge.ok { background:#1a2e1f; color:var(--green); border:1px solid #2a4830; }
+.status-badge.warn { background:#2e2a1a; color:var(--yellow); border:1px solid #483e28; }
+.status-badge.err { background:#2e1a1a; color:var(--red); border:1px solid #482828; }
+.status-badge.info { background:#1a1f2e; color:var(--blue); border:1px solid #2a3548; }
+
+.empty { padding:24px; text-align:center; color:var(--muted); font-size:12px; }
+
+/* ── Modal ── */
+.modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.65); display:none; align-items:center; justify-content:center; z-index:100; }
+.modal-bg.show { display:flex; }
+.modal { background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:20px; width:420px; max-width:90vw; }
+.modal h3 { font-family:'JetBrains Mono',monospace; font-size:14px; margin-bottom:14px; }
+.field { margin-bottom:10px; }
+.field label { display:block; font-family:'JetBrains Mono',monospace; font-size:9px; color:var(--muted); margin-bottom:3px; text-transform:uppercase; letter-spacing:1px; }
+.field input, .field textarea { width:100%; padding:7px 10px; background:var(--bg3); border:1px solid var(--border); border-radius:var(--r); color:var(--text); font-family:'DM Sans',sans-serif; font-size:12px; outline:none; }
+.field textarea { min-height:60px; resize:vertical; font-family:'JetBrains Mono',monospace; }
+.field input:focus, .field textarea:focus { border-color:var(--green2); }
+.modal-btns { display:flex; gap:6px; justify-content:flex-end; margin-top:14px; }
+.mbtn { padding:6px 14px; border-radius:var(--r); font-family:'JetBrains Mono',monospace; font-size:11px; cursor:pointer; border:1px solid var(--border); }
+.mbtn.cancel { background:var(--bg3); color:var(--text2); }
+.mbtn.ok { background:var(--green2); border-color:var(--green2); color:var(--bg); font-weight:600; }
+
+/* Code */
+.bubble pre { background:var(--bg); border:1px solid var(--border); border-radius:var(--r); padding:8px; margin:4px 0; overflow-x:auto; font-family:'JetBrains Mono',monospace; font-size:11px; line-height:1.5; }
+.bubble code { font-family:'JetBrains Mono',monospace; font-size:11px; background:var(--bg); padding:1px 4px; border-radius:3px; }
+.bubble pre code { background:none; padding:0; }
+
+::-webkit-scrollbar { width:4px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+
+/* Config editor */
+.config-editor { width:100%; min-height:300px; background:var(--bg); border:1px solid var(--border); border-radius:var(--r); padding:12px; font-family:'JetBrains Mono',monospace; font-size:11px; line-height:1.5; color:var(--text); resize:vertical; outline:none; }
+.config-editor:focus { border-color:var(--green2); }
+
+/* Toast */
+.toast { position:fixed; bottom:20px; right:20px; padding:10px 16px; border-radius:var(--r); font-family:'JetBrains Mono',monospace; font-size:11px; z-index:200; animation:slideUp .2s ease; }
+.toast.ok { background:#1a2e1f; border:1px solid #2a4830; color:var(--green); }
+.toast.err { background:#2e1a1a; border:1px solid #482828; color:var(--red); }
+@keyframes slideUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="side">
+  <div class="side-head">
+    <div class="logo">&#x1F438;</div>
+    <div class="brand">OpenClaw<small>Command Center</small></div>
+  </div>
+  <div class="status" id="bar">
+    <div class="dot" id="dot"></div>
+    <span id="bar-text">Connecting...</span>
+  </div>
+
+  <div class="side-nav">
+    <div class="nav-item on" onclick="switchTab('chat')" data-tab="chat"><span class="nav-icon">&#x1F4AC;</span> Chat</div>
+    <div class="nav-item" onclick="switchTab('sessions')" data-tab="sessions"><span class="nav-icon">&#x1F4CB;</span> Sessions</div>
+    <div class="nav-item" onclick="switchTab('models')" data-tab="models"><span class="nav-icon">&#x1F9E0;</span> Models</div>
+    <div class="nav-item" onclick="switchTab('config')" data-tab="config"><span class="nav-icon">&#x2699;</span> Config</div>
+    <div class="nav-item" onclick="switchTab('pipelines')" data-tab="pipelines"><span class="nav-icon">&#x1F500;</span> Pipelines</div>
+    <div class="nav-item" onclick="switchTab('guardrails')" data-tab="guardrails"><span class="nav-icon">&#x1F6E1;</span> Guardrails</div>
+    <div class="nav-item" onclick="switchTab('observe')" data-tab="observe"><span class="nav-icon">&#x1F4CA;</span> Observe</div>
+    <div class="nav-item" onclick="switchTab('channels')" data-tab="channels"><span class="nav-icon">&#x1F4E1;</span> Channels</div>
+    <div class="nav-item" onclick="switchTab('schedules')" data-tab="schedules"><span class="nav-icon">&#x23F0;</span> Schedules</div>
+    <div class="nav-item" onclick="switchTab('system')" data-tab="system"><span class="nav-icon">&#x1F5A5;</span> System</div>
+    <div class="nav-item" onclick="switchTab('audit')" data-tab="audit"><span class="nav-icon">&#x1F4DC;</span> Audit</div>
+    <div class="nav-item" onclick="switchTab('billing')" data-tab="billing"><span class="nav-icon">&#x1F4B3;</span> Billing</div>
+    <div class="nav-item" onclick="switchTab('connectors')" data-tab="connectors"><span class="nav-icon">&#x1F50C;</span> Connectors</div>
+    <div class="nav-item" onclick="switchTab('templates')" data-tab="templates"><span class="nav-icon">&#x1F4E6;</span> Templates</div>
+    <div class="nav-item" onclick="switchTab('workflows')" data-tab="workflows"><span class="nav-icon">&#x1F504;</span> Workflows</div>
+    <div class="nav-item" onclick="switchTab('webhooks')" data-tab="webhooks"><span class="nav-icon">&#x1F514;</span> Webhooks</div>
+    <div class="nav-item" onclick="switchTab('autonomous')" data-tab="autonomous"><span class="nav-icon">&#x1F3AF;</span> Autonomous</div>
+  </div>
+
+  <div class="agents" id="agents-sidebar">
+    <div class="agents-title">Agents</div>
+    <div id="ag-list"></div>
+  </div>
+  <div class="side-foot">
+    <button class="sbtn" onclick="loadAgents()">Refresh</button>
+    <button class="sbtn" onclick="openModal('create-agent')">+ New</button>
+  </div>
+</aside>
+
+<!-- Main -->
+<main class="main">
+
+  <!-- ============ CHAT PANEL ============ -->
+  <div class="panel active" id="panel-chat">
+    <div class="topbar" id="topbar" style="display:none">
+      <div class="topbar-left">
+        <span class="topbar-title" id="top-agent">--</span>
+        <span class="badge" id="top-session">main</span>
+      </div>
+      <div class="topbar-actions">
+        <button class="tbtn" onclick="toggleAgentInfo()">Info</button>
+        <button class="tbtn" onclick="loadHistory()">History</button>
+        <button class="tbtn" onclick="abortChat()">Abort</button>
+        <button class="tbtn danger" onclick="resetMem()">Reset</button>
+      </div>
+    </div>
+
+    <!-- Agent Info Drawer -->
+    <div id="agent-info" style="display:none;background:var(--bg2);border-bottom:1px solid var(--border);padding:12px;font-size:11px;max-height:280px;overflow-y:auto">
+      <div id="agent-info-content"><div class="empty">Loading agent details...</div></div>
+    </div>
+
+    <div class="chat" id="chat">
+      <div class="welcome" id="welcome">
+        <div class="welcome-frog">&#x1F438;</div>
+        <h2>OpenClaw Command Center</h2>
+        <p>Select an agent from the sidebar to start chatting with your live OpenClaw gateway.</p>
+      </div>
+    </div>
+
+    <div class="input-area" id="input-area" style="display:none">
+      <div class="input-row">
+        <button class="attach-btn" id="attach-btn" onclick="$('file-input').click()" title="Attach file">&#128206;</button>
+        <input type="file" id="file-input" multiple style="display:none" onchange="handleFileSelect(this)">
+        <textarea id="msg-input" placeholder="Type a message..." rows="1"></textarea>
+        <button class="send" id="send-btn" onclick="send()">&#9654;</button>
+      </div>
+      <div id="pending-attachments" class="pending-attachments"></div>
+      <div class="opts">
+        <label class="opt"><input type="checkbox" id="chk-think"> Thinking</label>
+        <label class="opt"><input type="checkbox" id="chk-stream" checked> Stream</label>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SESSIONS PANEL ============ -->
+  <div class="panel" id="panel-sessions">
+    <div class="topbar">
+      <div class="topbar-left"><span class="topbar-title">Sessions</span></div>
+      <div class="topbar-actions"><button class="tbtn" onclick="loadSessions()">Refresh</button></div>
+    </div>
+    <div class="panel-content" id="sessions-content">
+      <div class="empty">Loading sessions...</div>
+    </div>
+  </div>
+
+  <!-- ============ MODELS PANEL ============ -->
+  <div class="panel" id="panel-models">
+    <div class="topbar">
+      <div class="topbar-left"><span class="topbar-title">Model &amp; Provider Settings</span></div>
+      <div class="topbar-actions"><button class="tbtn" onclick="loadModels()">Refresh</button></div>
+    </div>
+    <div class="panel-content" id="models-content">
+      <div class="empty">Loading models...</div>
+    </div>
+  </div>
+
+  <!-- ============ CONFIG PANEL ============ -->
+  <div class="panel" id="panel-config">
+    <div class="topbar">
+      <div class="topbar-left"><span class="topbar-title">Runtime Configuration</span></div>
+      <div class="topbar-actions">
+        <button class="tbtn" onclick="loadConfig()">Refresh</button>
+        <button class="tbtn primary" onclick="saveConfig()">Save</button>
+      </div>
+    </div>
+    <div class="panel-content">
+      <div class="card">
+        <div class="card-title">Config JSON <span class="badge" id="config-hash">--</span></div>
+        <textarea class="config-editor" id="config-editor" spellcheck="false">Loading...</textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ CHANNELS PANEL ============ -->
+  <div class="panel" id="panel-channels">
+    <div class="topbar">
+      <div class="topbar-left"><span class="topbar-title">Channels</span></div>
+      <div class="topbar-actions"><button class="tbtn" onclick="loadChannels()">Refresh</button></div>
+    </div>
+    <div class="panel-content" id="channels-content">
+      <div class="empty">Loading channels...</div>
+    </div>
+  </div>
+
+  <!-- ============ SCHEDULES PANEL ============ -->
+  <div class="panel" id="panel-schedules">
+    <div class="topbar">
+      <div class="topbar-left"><span class="topbar-title">Schedules</span></div>
+      <div class="topbar-actions">
+        <button class="tbtn" onclick="loadSchedules()">Refresh</button>
+        <button class="tbtn primary" onclick="openModal('create-schedule')">+ New Job</button>
+      </div>
+    </div>
+    <div class="panel-content" id="schedules-content">
+      <div class="empty">Loading schedules...</div>
+    </div>
+  </div>
+
+  <!-- ============ PIPELINES PANEL ============ -->
+  <div class="panel" id="panel-pipelines">
+    <div class="topbar">
+      <div class="topbar-left"><span class="topbar-title">Pipelines &amp; Workflows</span></div>
+      <div class="topbar-actions">
+        <button class="tbtn" onclick="loadTemplates()">Templates</button>
+      </div>
+    </div>
+    <div class="panel-content" id="pipelines-content">
+      <div class="card">
+        <div class="card-title">Run Pipeline</div>
+        <div style="font-size:11px;color:var(--text2);margin-bottom:10px">Chain multiple agents in sequence. Each step's output becomes available to the next.</div>
+        <div id="pipeline-steps">
+          <div class="pipeline-step" data-idx="0" style="display:grid;grid-template-columns:1fr 1fr 2fr .5fr;gap:6px;margin-bottom:6px">
+            <input placeholder="Step name" class="ps-name" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace">
+            <input placeholder="Agent ID" class="ps-agent" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace">
+            <input placeholder="Prompt (use {var} for template vars)" class="ps-prompt" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace">
+            <button class="tbtn" onclick="this.closest('.pipeline-step').remove()" style="font-size:10px">&#x2716;</button>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <button class="tbtn" onclick="addPipelineStep()">+ Step</button>
+          <input id="pipeline-vars" placeholder='Variables JSON: {"topic":"AI"}' style="flex:1;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace">
+          <button class="tbtn primary" onclick="runPipeline()">Run</button>
+        </div>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <div class="card-title">Batch Execution</div>
+        <div style="font-size:11px;color:var(--text2);margin-bottom:10px">Run multiple queries against a single agent in parallel.</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div><label style="font-size:10px;color:var(--muted)">Agent ID</label><input id="batch-agent" placeholder="main" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace"></div>
+          <div><label style="font-size:10px;color:var(--muted)">Concurrency</label><input id="batch-conc" type="number" value="3" min="1" max="10" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace"></div>
+        </div>
+        <textarea id="batch-queries" placeholder="One query per line..." rows="4" style="width:100%;margin-top:8px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:7px;font-size:11px;font-family:'JetBrains Mono',monospace;resize:vertical"></textarea>
+        <button class="tbtn primary" onclick="runBatch()" style="margin-top:6px">Run Batch</button>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <div class="card-title">Agent Templates</div>
+        <div id="templates-list"><div class="empty">Click Templates to load</div></div>
+      </div>
+      <div id="pipeline-results" style="margin-top:12px"></div>
+    </div>
+  </div>
+
+  <!-- ============ GUARDRAILS PANEL ============ -->
+  <div class="panel" id="panel-guardrails">
+    <div class="topbar">
+      <div class="topbar-left"><span class="topbar-title">Guardrails &amp; Eval</span></div>
+      <div class="topbar-actions"><button class="tbtn" onclick="loadGuardrails()">Refresh</button></div>
+    </div>
+    <div class="panel-content" id="guardrails-content">
+      <div class="card">
+        <div class="card-title">Safety Check</div>
+        <div style="font-size:11px;color:var(--text2);margin-bottom:10px">Run guardrails against text to check for safety issues.</div>
+        <textarea id="guard-text" placeholder="Enter text to check..." rows="3" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:7px;font-size:11px;font-family:'JetBrains Mono',monospace;resize:vertical"></textarea>
+        <div id="guard-checks" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px"></div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button class="tbtn primary" onclick="checkGuardrails('input')">Check Input</button>
+          <button class="tbtn" onclick="checkGuardrails('output')">Check Output</button>
+        </div>
+        <div id="guard-results" style="margin-top:10px"></div>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <div class="card-title">Agent Eval</div>
+        <div style="font-size:11px;color:var(--text2);margin-bottom:10px">Test an agent with predefined queries and expected outputs.</div>
+        <div style="margin-bottom:8px">
+          <label style="font-size:10px;color:var(--muted)">Agent ID</label>
+          <input id="eval-agent" placeholder="main" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace">
+        </div>
+        <div id="eval-cases">
+          <div class="eval-case" style="display:grid;grid-template-columns:1fr 1fr .3fr;gap:6px;margin-bottom:6px">
+            <input placeholder="Query" class="ec-query" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace">
+            <input placeholder="Expected (substring match)" class="ec-expected" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace">
+            <button class="tbtn" onclick="this.closest('.eval-case').remove()" style="font-size:10px">&#x2716;</button>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <button class="tbtn" onclick="addEvalCase()">+ Test Case</button>
+          <button class="tbtn primary" onclick="runEval()">Run Eval</button>
+        </div>
+        <div id="eval-results" style="margin-top:10px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ OBSERVE PANEL ============ -->
+  <div class="panel" id="panel-observe">
+    <div class="topbar">
+      <div class="topbar-left"><span class="topbar-title">Observability</span></div>
+      <div class="topbar-actions">
+        <button class="tbtn" onclick="loadObserve()">Refresh</button>
+        <button class="tbtn danger" onclick="clearCosts()">Clear Costs</button>
+      </div>
+    </div>
+    <div class="panel-content" id="observe-content">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px">
+        <div class="card" style="text-align:center"><div style="font-size:20px;font-weight:700;color:var(--green)" id="obs-queries">0</div><div style="font-size:10px;color:var(--muted)">Total Queries</div></div>
+        <div class="card" style="text-align:center"><div style="font-size:20px;font-weight:700;color:var(--yellow)" id="obs-cost">$0.00</div><div style="font-size:10px;color:var(--muted)">Total Cost</div></div>
+        <div class="card" style="text-align:center"><div style="font-size:20px;font-weight:700;color:var(--blue)" id="obs-tokens">0</div><div style="font-size:10px;color:var(--muted)">Total Tokens</div></div>
+        <div class="card" style="text-align:center"><div style="font-size:20px;font-weight:700;color:var(--purple)" id="obs-latency">0ms</div><div style="font-size:10px;color:var(--muted)">Avg Latency</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Cost by Agent</div>
+        <div id="obs-by-agent"><div class="empty">No data yet</div></div>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <div class="card-title">Recent Entries</div>
+        <div id="obs-entries"><div class="empty">No entries</div></div>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <div class="card-title">Prompt Versioning</div>
+        <div style="display:grid;grid-template-columns:1fr 2fr;gap:8px;margin-bottom:8px">
+          <input id="prompt-name" placeholder="Prompt name" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace">
+          <input id="prompt-tags" placeholder="Tags (comma-separated)" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace">
+        </div>
+        <textarea id="prompt-content" placeholder="Prompt content..." rows="3" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:7px;font-size:11px;font-family:'JetBrains Mono',monospace;resize:vertical"></textarea>
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <button class="tbtn primary" onclick="savePrompt()">Save Version</button>
+          <button class="tbtn" onclick="loadPrompts()">List Prompts</button>
+        </div>
+        <div id="prompts-list" style="margin-top:10px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SYSTEM PANEL ============ -->
+  <div class="panel" id="panel-system">
+    <div class="topbar">
+      <div class="topbar-left"><span class="topbar-title">System</span></div>
+      <div class="topbar-actions"><button class="tbtn" onclick="loadSystem()">Refresh</button></div>
+    </div>
+    <div class="panel-content" id="system-content">
+      <div class="empty">Loading...</div>
+    </div>
+  </div>
+
+  <!-- ============ AUDIT PANEL ============ -->
+  <div class="panel" id="panel-audit">
+    <div class="topbar">
+      <div class="topbar-left"><span class="topbar-title">Audit Log</span></div>
+      <div class="topbar-actions">
+        <button class="tbtn" onclick="loadAudit()">Refresh</button>
+        <button class="tbtn danger" onclick="clearAudit()">Clear</button>
+      </div>
+    </div>
+    <div class="panel-content" id="audit-content">
+      <div class="card">
+        <div class="card-title">Filters</div>
+        <div class="inline-form">
+          <input id="audit-agent" placeholder="Agent ID (optional)" style="width:180px">
+          <input id="audit-type" placeholder="Event type (optional)" style="width:180px">
+          <button class="tbtn primary" onclick="loadAudit()">Search</button>
+        </div>
+      </div>
+      <div class="card" style="margin-top:10px">
+        <div class="card-title">Log Event Manually</div>
+        <div class="inline-form">
+          <input id="audit-log-type" placeholder="Event type" style="width:140px">
+          <input id="audit-log-agent" placeholder="Agent ID" style="width:140px">
+          <input id="audit-log-action" placeholder="Action" style="width:140px">
+          <input id="audit-log-resource" placeholder="Resource" style="width:140px">
+          <button class="tbtn primary" onclick="logAuditEvent()">Log</button>
+        </div>
+      </div>
+      <div class="card" style="margin-top:10px">
+        <div class="card-title">Events <span class="badge" id="audit-count">0</span></div>
+        <div id="audit-events"><div class="empty">No events yet</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ BILLING PANEL ============ -->
+  <div class="panel" id="panel-billing">
+    <div class="topbar">
+      <div class="topbar-left"><span class="topbar-title">Billing</span></div>
+      <div class="topbar-actions"><button class="tbtn" onclick="loadBilling()">Refresh</button></div>
+    </div>
+    <div class="panel-content" id="billing-content">
+      <div class="card">
+        <div class="card-title">Add Pricing Tier</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
+          <div><label style="font-size:10px;color:var(--muted)">Tenant ID</label><input id="bill-tenant" placeholder="tenant-1" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace"></div>
+          <div><label style="font-size:10px;color:var(--muted)">Tier Name</label><input id="bill-tier-name" placeholder="Pro" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace"></div>
+          <div><label style="font-size:10px;color:var(--muted)">Input $/M tokens</label><input id="bill-input-price" type="number" step="0.01" value="3.00" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+          <div><label style="font-size:10px;color:var(--muted)">Output $/M tokens</label><input id="bill-output-price" type="number" step="0.01" value="15.00" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace"></div>
+          <div><label style="font-size:10px;color:var(--muted)">Included Queries</label><input id="bill-included" type="number" value="1000" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace"></div>
+          <div><label style="font-size:10px;color:var(--muted)">Overage $/query</label><input id="bill-overage" type="number" step="0.001" value="0.01" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace"></div>
+        </div>
+        <button class="tbtn primary" onclick="addBillingTier()" style="margin-top:8px">Add Tier</button>
+      </div>
+      <div class="card" style="margin-top:10px">
+        <div class="card-title">Pricing Tiers</div>
+        <div id="billing-tiers"><div class="empty">No tiers configured</div></div>
+      </div>
+      <div class="card" style="margin-top:10px">
+        <div class="card-title">Record Usage</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px">
+          <div><label style="font-size:10px;color:var(--muted)">Tenant ID</label><input id="bill-use-tenant" placeholder="tenant-1" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace"></div>
+          <div><label style="font-size:10px;color:var(--muted)">Agent ID</label><input id="bill-use-agent" placeholder="main" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace"></div>
+          <div><label style="font-size:10px;color:var(--muted)">Input Tokens</label><input id="bill-use-input" type="number" value="500" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace"></div>
+          <div><label style="font-size:10px;color:var(--muted)">Output Tokens</label><input id="bill-use-output" type="number" value="200" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace"></div>
+        </div>
+        <button class="tbtn primary" onclick="recordBillingUsage()" style="margin-top:8px">Record</button>
+      </div>
+      <div class="card" style="margin-top:10px">
+        <div class="card-title">Generate Invoice</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+          <div><label style="font-size:10px;color:var(--muted)">Tenant ID</label><input id="bill-inv-tenant" placeholder="tenant-1" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace"></div>
+          <div><label style="font-size:10px;color:var(--muted)">Period Start</label><input id="bill-inv-start" type="datetime-local" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace"></div>
+          <div><label style="font-size:10px;color:var(--muted)">Period End</label><input id="bill-inv-end" type="datetime-local" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace"></div>
+        </div>
+        <button class="tbtn primary" onclick="generateInvoice()" style="margin-top:8px">Generate</button>
+      </div>
+      <div class="card" style="margin-top:10px">
+        <div class="card-title">Invoices</div>
+        <div id="billing-invoices"><div class="empty">No invoices yet</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ CONNECTORS PANEL ============ -->
+  <div class="panel" id="panel-connectors">
+    <div class="topbar">
+      <div class="topbar-left"><span class="topbar-title">SaaS Connectors</span></div>
+      <div class="topbar-actions"><button class="tbtn" onclick="loadConnectors()">Refresh</button></div>
+    </div>
+    <div class="panel-content" id="connectors-content">
+      <div class="card">
+        <div class="card-title">Connect a Service</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div>
+            <label style="font-size:10px;color:var(--muted)">Connector Type</label>
+            <select id="conn-type" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:6px 8px;font-size:12px;font-family:'JetBrains Mono',monospace">
+              <option value="">Select...</option>
+            </select>
+          </div>
+          <div><label style="font-size:10px;color:var(--muted)">API Key</label><input id="conn-key" type="password" placeholder="api-key-or-token" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace"></div>
+        </div>
+        <button class="tbtn primary" onclick="connectConnector()">Connect</button>
+      </div>
+      <div class="card" style="margin-top:10px">
+        <div class="card-title">Execute Action</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div>
+            <label style="font-size:10px;color:var(--muted)">Connector</label>
+            <select id="conn-exec-type" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:6px 8px;font-size:12px;font-family:'JetBrains Mono',monospace">
+              <option value="">Select...</option>
+            </select>
+          </div>
+          <div><label style="font-size:10px;color:var(--muted)">Action</label><input id="conn-action" placeholder="e.g. list_repos" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace"></div>
+        </div>
+        <div><label style="font-size:10px;color:var(--muted)">Params (JSON)</label><input id="conn-params" placeholder='{"org":"myorg"}' style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace"></div>
+        <button class="tbtn primary" onclick="executeConnectorAction()" style="margin-top:8px">Execute</button>
+        <div id="conn-result" style="margin-top:8px"></div>
+      </div>
+      <div class="card" style="margin-top:10px">
+        <div class="card-title">Available Connectors</div>
+        <div id="connectors-list"><div class="empty">Loading...</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ TEMPLATES PANEL ============ -->
+  <div class="panel" id="panel-templates">
+    <div class="topbar">
+      <div class="topbar-left"><span class="topbar-title">Agent Templates</span></div>
+      <div class="topbar-actions"><button class="tbtn" onclick="loadTemplatesTab()">Refresh</button></div>
+    </div>
+    <div class="panel-content" id="templates-content">
+      <div class="card">
+        <div class="card-title">Create Agent from Template</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div>
+            <label style="font-size:10px;color:var(--muted)">Template</label>
+            <select id="tmpl-name" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:6px 8px;font-size:12px;font-family:'JetBrains Mono',monospace">
+              <option value="">Select template...</option>
+            </select>
+          </div>
+          <div><label style="font-size:10px;color:var(--muted)">Agent ID</label><input id="tmpl-agent-id" placeholder="my-agent" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace"></div>
+        </div>
+        <button class="tbtn primary" onclick="createFromTemplateTab()">Create Agent</button>
+      </div>
+      <div class="card" style="margin-top:10px">
+        <div class="card-title">Available Templates</div>
+        <div id="templates-tab-list"><div class="empty">Loading...</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ WORKFLOWS PANEL ============ -->
+  <div class="panel" id="panel-workflows">
+    <div class="topbar">
+      <div class="topbar-left"><span class="topbar-title">Workflows</span></div>
+      <div class="topbar-actions">
+        <button class="tbtn" onclick="loadWorkflows()">Refresh</button>
+      </div>
+    </div>
+    <div class="panel-content" id="workflows-content">
+      <div class="card">
+        <div class="card-title">Run Workflow</div>
+        <div style="font-size:11px;color:var(--text2);margin-bottom:10px">Select a preset workflow, provide agent IDs, and run it with context.</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div>
+            <label style="font-size:10px;color:var(--muted)">Preset</label>
+            <select id="wf-preset" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:6px 8px;font-size:12px;font-family:'JetBrains Mono',monospace" onchange="onWorkflowPresetChange()">
+              <option value="">Select preset...</option>
+            </select>
+          </div>
+          <div id="wf-agents-fields"></div>
+        </div>
+        <div><label style="font-size:10px;color:var(--muted)">Context (JSON)</label><input id="wf-context" placeholder='{"topic":"AI safety"}' style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace"></div>
+        <button class="tbtn primary" onclick="runWorkflow()" style="margin-top:8px">Run Workflow</button>
+      </div>
+      <div class="card" style="margin-top:10px">
+        <div class="card-title">Preset Workflows</div>
+        <div id="workflows-presets"><div class="empty">Loading...</div></div>
+      </div>
+      <div class="card" style="margin-top:10px">
+        <div class="card-title">Status</div>
+        <div id="workflows-status"><div class="empty">No workflows run yet</div></div>
+      </div>
+      <div id="workflow-results" style="margin-top:10px"></div>
+    </div>
+  </div>
+
+  <!-- ============ WEBHOOKS PANEL ============ -->
+  <div class="panel" id="panel-webhooks">
+    <div class="topbar">
+      <div class="topbar-left"><span class="topbar-title">Webhooks</span></div>
+      <div class="topbar-actions"><button class="tbtn" onclick="loadWebhooks()">Refresh</button></div>
+    </div>
+    <div class="panel-content" id="webhooks-content">
+      <div class="card">
+        <div class="card-title">Register Webhook</div>
+        <div style="display:grid;grid-template-columns:1fr 2fr;gap:8px;margin-bottom:8px">
+          <div><label style="font-size:10px;color:var(--muted)">Name</label><input id="wh-name" placeholder="my-webhook" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace"></div>
+          <div><label style="font-size:10px;color:var(--muted)">URL</label><input id="wh-url" placeholder="https://example.com/webhook" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px">
+          <div><label style="font-size:10px;color:var(--muted)">Events (comma-separated, blank for all)</label><input id="wh-events" placeholder="chat.done, agent.error" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace"></div>
+          <div><label style="font-size:10px;color:var(--muted)">Secret (optional)</label><input id="wh-secret" type="password" placeholder="secret" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace"></div>
+        </div>
+        <button class="tbtn primary" onclick="registerWebhook()" style="margin-top:8px">Register</button>
+      </div>
+      <div class="card" style="margin-top:10px">
+        <div class="card-title">Registered Webhooks</div>
+        <div id="webhooks-list"><div class="empty">No webhooks registered</div></div>
+      </div>
+      <div class="card" style="margin-top:10px">
+        <div class="card-title">Delivery History</div>
+        <div id="webhooks-deliveries"><div class="empty">No deliveries</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ AUTONOMOUS PANEL ============ -->
+  <div class="panel" id="panel-autonomous">
+    <div class="topbar">
+      <div class="topbar-left"><span class="topbar-title">Autonomous Agents</span></div>
+      <div class="topbar-actions"><button class="tbtn" onclick="loadAutonomous()">Refresh</button></div>
+    </div>
+    <div class="panel-content" id="autonomous-content">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px">
+        <div class="card" style="text-align:center"><div style="font-size:18px;font-weight:700;color:var(--green)" id="auto-cost-remain">--</div><div style="font-size:10px;color:var(--muted)">Cost Remaining</div></div>
+        <div class="card" style="text-align:center"><div style="font-size:18px;font-weight:700;color:var(--blue)" id="auto-tokens-remain">--</div><div style="font-size:10px;color:var(--muted)">Tokens Remaining</div></div>
+        <div class="card" style="text-align:center"><div style="font-size:18px;font-weight:700;color:var(--yellow)" id="auto-cost-spent">$0</div><div style="font-size:10px;color:var(--muted)">Cost Spent</div></div>
+        <div class="card" style="text-align:center"><div style="font-size:18px;font-weight:700" id="auto-exhausted" style="color:var(--green)">OK</div><div style="font-size:10px;color:var(--muted)">Budget Status</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Create Goal</div>
+        <div style="margin-bottom:8px"><label style="font-size:10px;color:var(--muted)">Description</label><textarea id="auto-goal-desc" placeholder="Research the latest advancements in quantum computing and produce a summary..." rows="2" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:7px;font-size:11px;font-family:'JetBrains Mono',monospace;resize:vertical"></textarea></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div><label style="font-size:10px;color:var(--muted)">Max Steps</label><input id="auto-max-steps" type="number" value="10" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace"></div>
+          <div style="display:flex;align-items:flex-end"><button class="tbtn" onclick="createGoal()" style="width:100%">Create Goal</button></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:10px">
+        <div class="card-title">Run Goal with Agent</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div><label style="font-size:10px;color:var(--muted)">Agent ID</label><input id="auto-run-agent" placeholder="main" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace"></div>
+          <div><label style="font-size:10px;color:var(--muted)">Max Steps</label><input id="auto-run-steps" type="number" value="5" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace"></div>
+        </div>
+        <div style="margin-bottom:8px"><label style="font-size:10px;color:var(--muted)">Goal Description</label><textarea id="auto-run-desc" placeholder="Analyze the codebase and suggest optimizations..." rows="2" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:7px;font-size:11px;font-family:'JetBrains Mono',monospace;resize:vertical"></textarea></div>
+        <button class="tbtn primary" onclick="runGoalLoop()">Run Goal Loop</button>
+      </div>
+      <div class="card" style="margin-top:10px">
+        <div class="card-title">Goals</div>
+        <div id="autonomous-goals"><div class="empty">No goals created yet</div></div>
+      </div>
+      <div id="autonomous-results" style="margin-top:10px"></div>
+    </div>
+  </div>
+
+</main>
+
+<!-- Create Agent Modal -->
+<div class="modal-bg" id="modal-create-agent" onclick="if(event.target===this)closeModals()">
+  <div class="modal">
+    <h3>Create Agent</h3>
+    <div class="field"><label>Agent ID</label><input id="m-id" placeholder="e.g. research-bot"></div>
+    <div class="field"><label>System Prompt</label><textarea id="m-prompt" placeholder="You are a helpful assistant."></textarea></div>
+    <div class="modal-btns">
+      <button class="mbtn cancel" onclick="closeModals()">Cancel</button>
+      <button class="mbtn ok" onclick="createAgent()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Create Schedule Modal -->
+<div class="modal-bg" id="modal-create-schedule" onclick="if(event.target===this)closeModals()">
+  <div class="modal">
+    <h3>Create Cron Job</h3>
+    <div class="field"><label>Name</label><input id="s-name" placeholder="e.g. daily-report"></div>
+    <div class="field"><label>Cron Expression</label><input id="s-cron" placeholder="0 9 * * *"></div>
+    <div class="field"><label>Agent ID</label><input id="s-agent" placeholder="main"></div>
+    <div class="field"><label>Message</label><textarea id="s-message" placeholder="Generate the daily report"></textarea></div>
+    <div class="modal-btns">
+      <button class="mbtn cancel" onclick="closeModals()">Cancel</button>
+      <button class="mbtn ok" onclick="createSchedule()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Approval Modal -->
+<div class="modal-bg" id="modal-approval" onclick="if(event.target===this)closeModals()">
+  <div class="modal">
+    <h3>Resolve Approval</h3>
+    <div class="field"><label>Request ID</label><input id="a-id" placeholder="request-id"></div>
+    <div class="field">
+      <label>Decision</label>
+      <select id="a-decision" style="width:100%;padding:7px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-size:12px;">
+        <option value="approve">Approve</option>
+        <option value="deny">Deny</option>
+      </select>
+    </div>
+    <div class="modal-btns">
+      <button class="mbtn cancel" onclick="closeModals()">Cancel</button>
+      <button class="mbtn ok" onclick="resolveApproval()">Submit</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+//  State
+// ══════════════════════════════════════════
+let curAgent = null;
+let curTab = 'chat';
+let convos = {};
+let busy = false;
+let configHash = null;
+
+// ══════════════════════════════════════════
+//  API helper
+// ══════════════════════════════════════════
+async function api(m, url, body) {
+  const o = {method:m, headers:{'Content-Type':'application/json'}};
+  if (body) o.body = JSON.stringify(body);
+  const r = await fetch(url, o);
+  if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.detail||r.statusText); }
+  return r.json();
+}
+
+// ══════════════════════════════════════════
+//  Tab navigation
+// ══════════════════════════════════════════
+function switchTab(tab) {
+  curTab = tab;
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('on'));
+  $(`panel-${tab}`).classList.add('active');
+  document.querySelector(`.nav-item[data-tab="${tab}"]`).classList.add('on');
+
+  // Load data for the tab
+  if (tab === 'sessions') loadSessions();
+  else if (tab === 'models') loadModels();
+  else if (tab === 'pipelines') loadPipelines();
+  else if (tab === 'guardrails') loadGuardrails();
+  else if (tab === 'observe') loadObserve();
+  else if (tab === 'config') loadConfig();
+  else if (tab === 'channels') loadChannels();
+  else if (tab === 'schedules') loadSchedules();
+  else if (tab === 'system') loadSystem();
+  else if (tab === 'audit') loadAudit();
+  else if (tab === 'billing') loadBilling();
+  else if (tab === 'connectors') loadConnectors();
+  else if (tab === 'templates') loadTemplatesTab();
+  else if (tab === 'workflows') loadWorkflows();
+  else if (tab === 'webhooks') loadWebhooks();
+  else if (tab === 'autonomous') loadAutonomous();
+}
+
+// ══════════════════════════════════════════
+//  Health
+// ══════════════════════════════════════════
+async function checkHealth() {
+  const dot = $('dot'), txt = $('bar-text');
+  try {
+    const h = await api('GET','/api/health');
+    dot.className = h.healthy ? 'dot on' : 'dot off';
+    txt.textContent = h.healthy ? `Connected ${h.latency_ms?h.latency_ms+'ms':''}` : 'Unhealthy';
+  } catch {
+    dot.className = 'dot off';
+    txt.textContent = 'Disconnected';
+  }
+}
+
+// ══════════════════════════════════════════
+//  Agents
+// ══════════════════════════════════════════
+const ICONS = ['\u{1F916}','\u{1F9E0}','\u{1F50D}','\u{1F4DD}','\u{2699}','\u{1F680}','\u{1F4AC}','\u{1F31F}'];
+function icon(id) { let h=0; for(const c of id) h=((h<<5)-h)+c.charCodeAt(0); return ICONS[Math.abs(h)%ICONS.length]; }
+
+async function loadAgents() {
+  const el = $('ag-list');
+  try {
+    const {agents} = await api('GET','/api/agents');
+    if (!agents.length) { el.innerHTML = '<div class="empty">No agents</div>'; return; }
+    el.innerHTML = agents.map(a => `
+      <div class="ag ${a.agent_id===curAgent?'on':''}" onclick="pick('${esc(a.agent_id)}')">
+        <div class="ag-icon">${icon(a.agent_id)}</div>
+        <div><div class="ag-name">${esc(a.agent_id)}</div><div class="ag-status">${a.status}</div></div>
+        <div class="ag-actions">
+          <button class="ag-btn" onclick="event.stopPropagation();deleteAgent('${esc(a.agent_id)}')" title="Delete">&#x2716;</button>
+        </div>
+      </div>`).join('');
+  } catch(e) {
+    el.innerHTML = `<div style="padding:8px;color:var(--red);font-size:12px">${esc(e.message)}</div>`;
+  }
+}
+
+function pick(id) {
+  curAgent = id;
+  switchTab('chat');
+  $('topbar').style.display = 'flex';
+  $('input-area').style.display = 'block';
+  $('top-agent').textContent = id;
+  const w = $('welcome'); if(w) w.remove();
+  document.querySelectorAll('.ag').forEach(e => e.classList.toggle('on', e.onclick?.toString().includes(`'${id}'`)));
+  render();
+  $('msg-input').focus();
+}
+
+async function deleteAgent(id) {
+  if (!confirm(`Delete agent "${id}"? This removes all sessions.`)) return;
+  try { await api('DELETE',`/api/agents/${id}`); toast('Agent deleted','ok'); loadAgents(); }
+  catch(e) { toast(e.message,'err'); }
+}
+
+// ══════════════════════════════════════════
+//  Agent Introspection
+// ══════════════════════════════════════════
+async function toggleAgentInfo() {
+  const el = $('agent-info');
+  if (el.style.display === 'none') {
+    el.style.display = 'block';
+    await loadAgentInfo();
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+async function loadAgentInfo() {
+  if (!curAgent) return;
+  const el = $('agent-info-content');
+  el.innerHTML = '<div class="empty">Loading...</div>';
+  try {
+    const d = await api('GET', `/api/agents/${curAgent}/details`);
+    el.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px">
+        <div class="card" style="text-align:center;padding:8px">
+          <div style="font-size:14px;font-weight:700;color:${d.status==='idle'?'var(--green)':d.status==='running'?'var(--blue)':'var(--muted)'}">${esc(d.status)}</div>
+          <div style="font-size:9px;color:var(--muted)">Status</div>
+        </div>
+        <div class="card" style="text-align:center;padding:8px">
+          <div style="font-size:14px;font-weight:700;color:var(--purple)">${d.model?.provider||'--'}</div>
+          <div style="font-size:9px;color:var(--muted)">Provider</div>
+        </div>
+        <div class="card" style="text-align:center;padding:8px">
+          <div style="font-size:14px;font-weight:700;color:var(--blue)">${d.model?.model||'--'}</div>
+          <div style="font-size:9px;color:var(--muted)">Model</div>
+        </div>
+      </div>
+      ${d.sessions?.length ? `
+        <div style="font-weight:600;color:var(--green);margin-bottom:4px;font-size:10px">Sessions (${d.sessions.length})</div>
+        <table style="width:100%;font-size:10px;border-collapse:collapse;margin-bottom:8px">
+          <tr style="color:var(--muted);text-align:left"><th style="padding:3px">Key</th><th>Model</th><th>Input</th><th>Output</th><th>Updated</th></tr>
+          ${d.sessions.map(s => `<tr style="border-top:1px solid var(--border)">
+            <td style="padding:3px;color:var(--text2)">${esc((s.key||'').split(':').pop())}</td>
+            <td style="color:var(--muted)">${esc(s.model||'--')}</td>
+            <td style="color:var(--text2)">${s.inputTokens||0}</td>
+            <td style="color:var(--text2)">${s.outputTokens||0}</td>
+            <td style="color:var(--muted)">${s.lastUpdated ? new Date(s.lastUpdated).toLocaleTimeString() : '--'}</td>
+          </tr>`).join('')}
+        </table>` : ''}
+      ${d.memory ? `
+        <div style="font-weight:600;color:var(--green);margin-bottom:4px;font-size:10px">Memory</div>
+        <pre style="background:var(--bg);padding:6px;border-radius:var(--r);font-size:10px;color:var(--text2);white-space:pre-wrap;max-height:100px;overflow-y:auto">${esc(JSON.stringify(d.memory, null, 2))}</pre>` : ''}
+    `;
+  } catch(e) {
+    el.innerHTML = `<div class="empty" style="color:var(--red)">${esc(e.message)}</div>`;
+  }
+}
+
+async function loadHistory() {
+  if (!curAgent) return;
+  try {
+    const res = await api('GET', `/api/agents/${curAgent}/history`);
+    const preview = res.preview;
+    if (preview) {
+      toast('History loaded', 'ok');
+      console.log('Agent History:', preview);
+      const el = $('agent-info-content');
+      $('agent-info').style.display = 'block';
+      // Extract items from preview response
+      let items = [];
+      if (preview.previews) {
+        for (const p of preview.previews) {
+          if (p.items) items = items.concat(p.items);
+        }
+      } else if (Array.isArray(preview)) {
+        items = preview;
+      }
+      let msgsHtml = '';
+      if (items.length) {
+        msgsHtml = items.slice(-20).map(item => {
+          const role = item.role || 'unknown';
+          const text = (item.text || '').replace(/<\/?final>/g, '').substring(0, 300);
+          const roleColor = role === 'user' ? 'var(--blue)' : role === 'assistant' ? 'var(--green)' : 'var(--muted)';
+          const roleIcon = role === 'user' ? '👤' : role === 'assistant' ? '🐸' : '🔧';
+          return `<div style="margin-bottom:6px;padding:6px 8px;background:var(--bg);border-radius:var(--r);border-left:2px solid ${roleColor}">
+            <span style="font-size:10px;color:${roleColor};font-weight:600">${roleIcon} ${esc(role)}</span>
+            <div style="font-size:11px;color:var(--text2);margin-top:2px;word-break:break-word">${esc(text)}${item.text && item.text.length > 300 ? '…' : ''}</div>
+          </div>`;
+        }).join('');
+      } else {
+        msgsHtml = '<div style="color:var(--muted);font-size:11px">No messages found</div>';
+      }
+      el.innerHTML = `
+        <div style="font-weight:600;color:var(--green);margin-bottom:8px">Conversation History <span style="color:var(--muted);font-weight:400;font-size:10px">(last ${Math.min(items.length, 20)} of ${items.length})</span></div>
+        <div style="max-height:300px;overflow-y:auto">${msgsHtml}</div>
+      `;
+    } else {
+      toast(res.error || 'No history available', 'err');
+    }
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+// ══════════════════════════════════════════
+//  Chat rendering
+// ══════════════════════════════════════════
+function render() {
+  const el = $('chat');
+  const msgs = convos[curAgent] || [];
+  el.innerHTML = msgs.map(m => {
+    const isUser = m.role==='user';
+    let body = '';
+
+    // User attachment thumbnails
+    if (isUser && m.attachments?.length) {
+      body += '<div class="attachment-preview">';
+      for (const att of m.attachments) {
+        if (att.mime_type?.startsWith('image/')) {
+          body += `<div class="attachment-thumb"><img src="data:${esc(att.mime_type)};base64,${att.content_base64}" alt="${esc(att.file_name)}"><div class="att-name">${esc(att.file_name)}</div></div>`;
+        } else {
+          const icon = att.mime_type?.includes('pdf') ? '\u{1F4C4}' : '\u{1F4CE}';
+          body += `<div class="attachment-thumb"><div class="att-file">${icon} ${esc(att.file_name)}</div></div>`;
+        }
+      }
+      body += '</div>';
+    }
+
+    // Event timeline (real-time activity log during streaming)
+    if (!isUser && m.events?.length) {
+      body += '<div class="event-timeline">';
+      for (const evt of m.events) {
+        const dotClass = evt.type === 'tool_call' ? 'tool' : evt.type === 'thinking' ? 'thinking' : evt.type === 'file_generated' ? 'file' : evt.type === 'done' ? 'done' : evt.type === 'error' ? 'error' : 'content';
+        body += `<div class="evt"><span class="evt-dot ${dotClass}"></span><span class="evt-time">${evt.time||''}</span><span>${esc(evt.label)}</span></div>`;
+      }
+      body += '</div>';
+    }
+
+    // Thinking (clickable to expand/collapse)
+    if (m.thinking) {
+      const collapsed = !m.streaming && m.thinking.length > 200 ? ' collapsed' : '';
+      body += `<div class="thinking-box${collapsed}" onclick="this.classList.toggle('collapsed')">
+        <div class="label">\u{1F9E0} Thinking <span class="thinking-toggle">${collapsed ? '\u25B6 show' : '\u25BC hide'}</span></div>
+        <div class="thinking-content">${esc(m.thinking)}</div>
+      </div>`;
+    }
+
+    // Tool calls with live status
+    if (m.tool_calls?.length) {
+      for (let i = 0; i < m.tool_calls.length; i++) {
+        const tc = m.tool_calls[i];
+        const isLast = i === m.tool_calls.length - 1;
+        const running = m.streaming && isLast && !tc.output;
+        const statusClass = running ? ' running' : ' done';
+        const statusIcon = running ? '\u23F3' : '\u2705';
+        body += `<div class="tool-box${statusClass}"><div class="label">\u{1F527} ${esc(tc.tool)} <span class="status-icon">${statusIcon}</span></div>`;
+        if (tc.input) body += `<div class="output" style="color:var(--muted);font-size:10px;border-top:none;margin-top:2px;max-height:60px">${esc(typeof tc.input === 'string' ? tc.input : JSON.stringify(tc.input))}</div>`;
+        if (tc.output) body += `<div class="output">${esc(String(tc.output).substring(0, 2000))}${String(tc.output).length > 2000 ? '...' : ''}</div>`;
+        body += '</div>';
+      }
+    }
+
+    // Generated files (with inline image preview for images)
+    if (m.files?.length) {
+      for (const f of m.files) {
+        const isImage = (f.mimeType||'').startsWith('image/');
+        body += `<div class="file-box"><div class="label">\u{1F4C1} ${esc(f.name||'File')}</div>`;
+        body += `<div>${esc(f.path||'')} (${fmtSize(f.size_bytes||f.size||0)})</div>`;
+        if (isImage && f.path) body += `<img src="/api/files?path=${encodeURIComponent(f.path)}" alt="${esc(f.name||'')}" onerror="this.style.display='none'">`;
+        body += '</div>';
+      }
+    }
+
+    const errorClass = m.error ? ' error' : '';
+    body += `<div class="bubble${errorClass}">${fmt(m.content||'')}${m.streaming?'<span class="cursor"></span>':''}</div>`;
+
+    let meta = '';
+    if (m.latency_ms) meta += m.latency_ms + 'ms';
+    if (m.usage) { const u=m.usage; if(u.input||u.output) meta += ` | ${u.input||0}/${u.output||0} tok`; }
+    if (m.stop_reason && m.stop_reason !== 'complete') meta += ` | ${m.stop_reason}`;
+    if (meta) meta = `<div class="meta">${meta}</div>`;
+
+    return `<div class="msg ${isUser?'user':'assistant'}">
+      <div class="avatar">${isUser?'\u{1F464}':'\u{1F438}'}</div>
+      <div style="flex:1;min-width:0">${body}${meta}</div>
+    </div>`;
+  }).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+function fmt(s) {
+  if (!s) return '';
+  let h = esc(s);
+  h = h.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+  h = h.replace(/`([^`]+)`/g, '<code>$1</code>');
+  h = h.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  // Markdown images: ![alt](url) — convert file:// URLs to /api/files
+  h = h.replace(/!\[([^\]]*)\]\(file:\/\/\/?([^)]+)\)/g, (m, alt, rawPath) => {
+    const fpath = rawPath.replace(/\//g, '\\');
+    const url = '/api/files?path=' + encodeURIComponent(fpath);
+    return `<img src="${url}" alt="${alt}" style="max-width:400px;max-height:300px;border-radius:8px;margin:6px 0;cursor:pointer;border:1px solid var(--border)" onclick="window.open('${url}','_blank')" onerror="this.style.display='none'">`;
+  });
+  // Markdown links: [text](url)
+  h = h.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2" target="_blank" style="color:var(--green)">$1</a>');
+  // Auto-detect workspace file paths and render inline previews (images)
+  h = h.replace(/((?:C:\\Users\\[^\s<]+?\\\.openclaw\\workspace\\[^\s<]+?\.(png|jpg|jpeg|gif|webp|svg)))/gi, (match, path) => {
+    // Skip if already inside an <img> or <a> tag (already rendered above)
+    const url = '/api/files?path=' + encodeURIComponent(path.replace(/&amp;/g,'&'));
+    return `<a href="${url}" target="_blank" style="color:var(--green)">${match}</a><br><img src="${url}" style="max-width:400px;max-height:300px;border-radius:8px;margin:6px 0;cursor:pointer;border:1px solid var(--border)" onclick="window.open('${url}','_blank')" onerror="this.style.display='none'">`;
+  });
+  // Non-image workspace files → download link
+  h = h.replace(/((?:C:\\Users\\[^\s<]+?\\\.openclaw\\workspace\\[^\s<]+?\.(?!png|jpg|jpeg|gif|webp|svg)[a-zA-Z0-9]+))/gi, (match, path) => {
+    const url = '/api/files?path=' + encodeURIComponent(path.replace(/&amp;/g,'&'));
+    return `<a href="${url}" target="_blank" download style="color:var(--green);text-decoration:underline">\u{1F4E5} ${match}</a>`;
+  });
+  return h;
+}
+
+function fmtCron(v) {
+  if (typeof v === 'string') return v;
+  if (v && typeof v === 'object') {
+    if (v.kind === 'every' && v.everyMs) return `every ${Math.round(v.everyMs/60000)}m`;
+    if (v.cron) return v.cron;
+    return JSON.stringify(v);
+  }
+  return String(v);
+}
+
+function fmtSize(b) {
+  if (b < 1024) return b + 'B';
+  if (b < 1048576) return (b/1024).toFixed(1) + 'KB';
+  return (b/1048576).toFixed(1) + 'MB';
+}
+
+// ══════════════════════════════════════════
+//  Chat: send
+// ══════════════════════════════════════════
+// ── Pending attachments state ──
+let pendingFiles = []; // [{file_name, mime_type, content_base64, dataUrl?}]
+
+function handleFileSelect(input) {
+  for (const file of input.files) {
+    if (file.size > 380 * 1024) {
+      toast(`Warning: ${file.name} (${fmtSize(file.size)}) may exceed the gateway's ~380 KB frame limit`, 'warn');
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result.split(',')[1];
+      const att = { file_name: file.name, mime_type: file.type || 'application/octet-stream', content_base64: base64 };
+      if (file.type?.startsWith('image/')) att.dataUrl = reader.result;
+      pendingFiles.push(att);
+      renderPendingAttachments();
+    };
+    reader.readAsDataURL(file);
+  }
+  input.value = '';
+}
+
+function removePendingFile(idx) {
+  pendingFiles.splice(idx, 1);
+  renderPendingAttachments();
+}
+
+function renderPendingAttachments() {
+  const el = $('pending-attachments');
+  const btn = $('attach-btn');
+  if (!pendingFiles.length) { el.innerHTML = ''; btn.classList.remove('has-files'); return; }
+  btn.classList.add('has-files');
+  el.innerHTML = pendingFiles.map((att, i) => {
+    const inner = att.dataUrl
+      ? `<img src="${att.dataUrl}" alt="${esc(att.file_name)}">`
+      : `<div class="pa-info">\u{1F4CE} ${esc(att.file_name)}</div>`;
+    return `<div class="pending-att">${inner}<button class="pa-remove" onclick="removePendingFile(${i})">\u00D7</button></div>`;
+  }).join('');
+}
+
+async function send() {
+  if (busy || !curAgent) return;
+  const inp = $('msg-input'), text = inp.value.trim();
+  if (!text && !pendingFiles.length) return;
+
+  const thinking = $('chk-think').checked;
+  const stream = $('chk-stream').checked;
+  const attachments = [...pendingFiles];
+
+  if (!convos[curAgent]) convos[curAgent] = [];
+  convos[curAgent].push({role:'user', content: text || '(attachment)', attachments: attachments.length ? attachments : undefined});
+  inp.value = ''; inp.style.height = 'auto';
+  pendingFiles = [];
+  renderPendingAttachments();
+  render();
+
+  busy = true;
+  $('send-btn').disabled = true;
+
+  if (stream) await doStream(text, thinking, attachments);
+  else await doBlocking(text, thinking, attachments);
+
+  busy = false;
+  $('send-btn').disabled = false;
+}
+
+async function doBlocking(text, thinking, attachments) {
+  convos[curAgent].push({role:'assistant', content:'...', streaming:true, events:[{type:'content', time:fmtTime(), label:'Waiting for response...'}]});
+  render();
+  try {
+    const payload = {agent_id:curAgent, message:text, thinking};
+    if (attachments?.length) payload.attachments = attachments.map(a => ({file_name:a.file_name, mime_type:a.mime_type, content_base64:a.content_base64}));
+    const d = await api('POST','/api/chat', payload);
+    const m = last();
+    m.content = d.content; m.thinking = d.thinking; m.tool_calls = d.tool_calls;
+    m.files = d.files; m.latency_ms = d.latency_ms; m.usage = d.token_usage;
+    m.stop_reason = d.stop_reason; m.error = !!d.error_message;
+    m.streaming = false;
+    // Build events from result
+    m.events = [];
+    if (d.thinking) m.events.push({type:'thinking', time:'', label:'Thought about the response'});
+    if (d.tool_calls?.length) d.tool_calls.forEach(tc => m.events.push({type:'tool_call', time:'', label:`Called ${tc.tool}`}));
+    if (d.files?.length) d.files.forEach(f => m.events.push({type:'file_generated', time:'', label:`Generated ${f.name||'file'}`}));
+    m.events.push({type:'done', time:d.latency_ms ? d.latency_ms+'ms' : '', label:'Complete'});
+  } catch(e) { const m=last(); m.content='Error: '+e.message; m.error=true; m.streaming=false; m.events=[{type:'error', time:fmtTime(), label:e.message}]; }
+  render();
+}
+
+function fmtTime() { const d = new Date(); return d.toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
+
+async function doStream(text, thinking, attachments) {
+  const startTime = Date.now();
+  convos[curAgent].push({role:'assistant', content:'', thinking:'', tool_calls:[], files:[], events:[], streaming:true});
+  render();
+  try {
+    const payload = {agent_id:curAgent, message:text, thinking};
+    if (attachments?.length) payload.attachments = attachments.map(a => ({file_name:a.file_name, mime_type:a.mime_type, content_base64:a.content_base64}));
+    const res = await fetch('/api/chat/stream', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(payload),
+    });
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let buf = '', evtType = '';
+    const m = last();
+
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, {stream:true});
+      const lines = buf.split('\n'); buf = lines.pop()||'';
+
+      for (const ln of lines) {
+        if (ln.startsWith('event:')) { evtType = ln.slice(6).trim(); continue; }
+        if (!ln.startsWith('data:')) continue;
+        const raw = ln.slice(5).trim();
+        if (!raw) continue;
+        let d; try { d = JSON.parse(raw); } catch { continue; }
+
+        const elapsed = ((Date.now()-startTime)/1000).toFixed(1)+'s';
+
+        if (evtType==='run_start') {
+          m.events.push({type:'content', time:fmtTime(), label:`Run started (${d.runId?.substring(0,8)||''})`});
+        }
+        else if (evtType==='content') {
+          m.content += d.text||'';
+          // Only log first content event
+          if (m.content.length === (d.text||'').length) m.events.push({type:'content', time:elapsed, label:'Streaming response...'});
+        }
+        else if (evtType==='thinking') {
+          m.thinking += d.text||'';
+          if (m.thinking.length === (d.text||'').length) m.events.push({type:'thinking', time:elapsed, label:'Thinking...'});
+        }
+        else if (evtType==='tool_call') {
+          m.tool_calls.push({tool:d.tool, input:d.input});
+          m.events.push({type:'tool_call', time:elapsed, label:`Calling tool: ${d.tool}`});
+        }
+        else if (evtType==='tool_result' && m.tool_calls.length) {
+          m.tool_calls[m.tool_calls.length-1].output = d.output;
+          m.events.push({type:'tool_call', time:elapsed, label:`Tool result received`});
+        }
+        else if (evtType==='file_generated') {
+          m.files.push(d);
+          m.events.push({type:'file', time:elapsed, label:`File: ${d.name||'generated'}`});
+        }
+        else if (evtType==='done') {
+          m.streaming=false; m.usage=d.usage; m.stop_reason=d.stopReason;
+          m.events.push({type:'done', time:elapsed, label:'Done'});
+        }
+        else if (evtType==='error') {
+          m.content+=d.message||''; m.error=true; m.streaming=false;
+          m.events.push({type:'error', time:elapsed, label:d.message||'Error'});
+        }
+
+        render();
+      }
+    }
+    m.streaming = false; render();
+  } catch(e) { const m=last(); if (!m.error) { m.content='Error: '+e.message; m.error=true; m.events.push({type:'error', time:fmtTime(), label:e.message}); } m.streaming=false; render(); }
+}
+
+function last() { return convos[curAgent][convos[curAgent].length-1]; }
+
+async function resetMem() {
+  if (!curAgent || !confirm('Reset memory for '+curAgent+'?')) return;
+  try { await api('POST',`/api/agents/${curAgent}/reset`); convos[curAgent]=[]; render(); toast('Memory reset','ok'); }
+  catch(e) { toast(e.message,'err'); }
+}
+
+async function abortChat() {
+  if (!curAgent) return;
+  try { await api('POST',`/api/agents/${curAgent}/abort`); toast('Run aborted','ok'); }
+  catch(e) { toast(e.message,'err'); }
+}
+
+// ══════════════════════════════════════════
+//  Sessions
+// ══════════════════════════════════════════
+async function loadSessions() {
+  const el = $('sessions-content');
+  try {
+    const {sessions} = await api('GET','/api/sessions');
+    if (!sessions || !sessions.length) { el.innerHTML = '<div class="empty">No active sessions</div>'; return; }
+
+    let html = '<table class="data-table"><thead><tr><th>Key</th><th>Model</th><th>Tokens</th><th>Updated</th><th>Actions</th></tr></thead><tbody>';
+    for (const s of sessions) {
+      const key = s.key || s.sessionKey || '';
+      const model = s.model || s.modelProvider || '--';
+      const tokens = (s.inputTokens||0) + (s.outputTokens||0);
+      const updated = s.updatedAt ? new Date(s.updatedAt).toLocaleString() : '--';
+      html += `<tr>
+        <td>${esc(key)}</td>
+        <td>${esc(model)}</td>
+        <td>${tokens.toLocaleString()}</td>
+        <td>${updated}</td>
+        <td>
+          <button class="tbtn" onclick="resetSession('${esc(key)}')">Reset</button>
+          <button class="tbtn" onclick="compactSession('${esc(key)}')">Compact</button>
+          <button class="tbtn danger" onclick="deleteSession('${esc(key)}')">Delete</button>
+        </td>
+      </tr>`;
+    }
+    html += '</tbody></table>';
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = `<div class="card"><div style="color:var(--red)">${esc(e.message)}</div></div>`;
+  }
+}
+
+async function resetSession(key) {
+  if (!confirm(`Reset session "${key}"?`)) return;
+  try { await api('POST',`/api/sessions/${key}/reset`); toast('Session reset','ok'); loadSessions(); }
+  catch(e) { toast(e.message,'err'); }
+}
+
+async function compactSession(key) {
+  try { await api('POST',`/api/sessions/${key}/compact`); toast('Session compacted','ok'); loadSessions(); }
+  catch(e) { toast(e.message,'err'); }
+}
+
+async function deleteSession(key) {
+  if (!confirm(`Delete session "${key}"? This is permanent.`)) return;
+  try { await api('DELETE',`/api/sessions/${key}`); toast('Session deleted','ok'); loadSessions(); }
+  catch(e) { toast(e.message,'err'); }
+}
+
+// ══════════════════════════════════════════
+//  Models & Providers
+// ══════════════════════════════════════════
+let knownProviders = {};
+
+async function loadModels() {
+  const el = $('models-content');
+  try {
+    // Fetch providers + current agent configs in parallel
+    const [provRes, agRes] = await Promise.all([
+      api('GET', '/api/models/providers'),
+      api('GET', '/api/models/all'),
+    ]);
+    knownProviders = provRes.providers || {};
+    const agents = agRes.agents || [];
+    if (!agents.length) {
+      el.innerHTML = '<div class="empty">No agents configured</div>';
+      return;
+    }
+    el.innerHTML = agents.map(a => {
+      // API now returns model (short name), model_full, and provider already parsed
+      const modelStr = a.model || '';
+      const prov = a.provider || 'unknown';
+      return `
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-title" style="display:flex;align-items:center;gap:8px">
+          ${icon(a.agent_id)} ${esc(a.agent_id)}
+          <span class="badge" style="margin-left:auto">${a.api_key_set ? 'API Key Set' : 'No API Key'}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+          <div>
+            <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px">Provider</label>
+            <select id="prov-${esc(a.agent_id)}" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:6px 8px;font-size:12px;font-family:'JetBrains Mono',monospace" onchange="onProviderChange('${esc(a.agent_id)}')">
+              ${Object.keys(knownProviders).map(p => `<option value="${p}" ${p===prov?'selected':''}>${p}</option>`).join('')}
+              ${!Object.keys(knownProviders).includes(prov) && prov !== 'unknown' ? `<option value="${esc(prov)}" selected>${esc(prov)}</option>` : ''}
+              <option value="__custom">Custom...</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px">Model</label>
+            <select id="model-${esc(a.agent_id)}" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:6px 8px;font-size:12px;font-family:'JetBrains Mono',monospace">
+              ${buildModelOptions(prov, modelStr)}
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:10px">
+          <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px">API Key <span style="color:var(--muted)">(leave blank to keep current)</span></label>
+          <input type="password" id="apikey-${esc(a.agent_id)}" placeholder="sk-..." style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:6px 8px;font-size:12px;font-family:'JetBrains Mono',monospace">
+        </div>
+        <div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end">
+          <button class="tbtn primary" onclick="setModel('${esc(a.agent_id)}')">Save Changes</button>
+        </div>
+      </div>
+    `;
+    }).join('');
+  } catch(e) {
+    el.innerHTML = `<div class="empty" style="color:var(--red)">${esc(e.message)}</div>`;
+  }
+}
+
+function buildModelOptions(provider, currentModel) {
+  const models = knownProviders[provider] || [];
+  let opts = models.map(m => `<option value="${m}" ${m===currentModel?'selected':''}>${m}</option>`).join('');
+  // If current model isn't in known list, add it
+  if (currentModel && currentModel !== 'unknown' && !models.includes(currentModel)) {
+    opts = `<option value="${esc(currentModel)}" selected>${esc(currentModel)}</option>` + opts;
+  }
+  opts += '<option value="__custom">Custom...</option>';
+  return opts;
+}
+
+function onProviderChange(agentId) {
+  const sel = $(`prov-${agentId}`);
+  if (sel.value === '__custom') {
+    const custom = prompt('Enter provider name:');
+    if (custom) {
+      const opt = document.createElement('option');
+      opt.value = custom; opt.textContent = custom; opt.selected = true;
+      sel.insertBefore(opt, sel.lastElementChild);
+    } else { sel.selectedIndex = 0; }
+  }
+  // Rebuild model dropdown for new provider
+  const modelSel = $(`model-${agentId}`);
+  const prov = sel.value === '__custom' ? '' : sel.value;
+  modelSel.innerHTML = buildModelOptions(prov, '');
+}
+
+async function setModel(agentId) {
+  const provSel = $(`prov-${agentId}`);
+  const modelSel = $(`model-${agentId}`);
+  const apiKeyIn = $(`apikey-${agentId}`);
+
+  let provider = provSel.value;
+  let model = modelSel.value;
+  const apiKey = apiKeyIn.value.trim() || null;
+
+  // Handle custom model selection
+  if (model === '__custom') {
+    model = prompt('Enter model name (e.g. gpt-4o, claude-sonnet-4-6):');
+    if (!model) return;
+  }
+  if (provider === '__custom') {
+    provider = prompt('Enter provider name:');
+    if (!provider) return;
+  }
+
+  try {
+    const body = { agent_id: agentId };
+    if (provider) body.provider = provider;
+    if (model) body.model = model;
+    if (apiKey) body.api_key = apiKey;
+    await api('POST', '/api/models/set', body);
+    toast(`Model updated for ${agentId}`, 'ok');
+    apiKeyIn.value = '';
+    loadModels();
+  } catch(e) {
+    toast(e.message, 'err');
+  }
+}
+
+// ══════════════════════════════════════════
+//  Pipelines, Batch, Templates
+// ══════════════════════════════════════════
+function loadPipelines() {
+  // Panel is static form — just load templates
+  loadTemplates();
+}
+
+function addPipelineStep() {
+  const container = $('pipeline-steps');
+  const div = document.createElement('div');
+  div.className = 'pipeline-step';
+  div.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 2fr .5fr;gap:6px;margin-bottom:6px';
+  div.innerHTML = `
+    <input placeholder="Step name" class="ps-name" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace">
+    <input placeholder="Agent ID" class="ps-agent" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace">
+    <input placeholder="Prompt (use {var} for template vars)" class="ps-prompt" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace">
+    <button class="tbtn" onclick="this.closest('.pipeline-step').remove()" style="font-size:10px">&#x2716;</button>`;
+  container.appendChild(div);
+}
+
+async function runPipeline() {
+  const steps = [];
+  document.querySelectorAll('.pipeline-step').forEach(row => {
+    const name = row.querySelector('.ps-name').value.trim();
+    const agent = row.querySelector('.ps-agent').value.trim();
+    const prompt = row.querySelector('.ps-prompt').value.trim();
+    if (name && agent && prompt) steps.push({name, agent_id: agent, prompt, output_key: name});
+  });
+  if (!steps.length) { toast('Add at least one step', 'err'); return; }
+  let variables = {};
+  try { const v = $('pipeline-vars').value.trim(); if (v) variables = JSON.parse(v); } catch { toast('Invalid variables JSON', 'err'); return; }
+  const el = $('pipeline-results');
+  el.innerHTML = '<div class="card"><div class="empty">Running pipeline...</div></div>';
+  try {
+    const res = await api('POST', '/api/pipelines/run', {steps, variables});
+    el.innerHTML = `<div class="card"><div class="card-title">${res.success ? '&#x2705;' : '&#x274C;'} Pipeline Result <span class="badge">${res.total_latency_ms}ms</span></div>
+      ${Object.entries(res.outputs||{}).map(([k,v]) => `<div style="margin-top:6px"><strong style="color:var(--green);font-size:11px">${esc(k)}:</strong><pre style="background:var(--bg);padding:8px;border-radius:var(--r);font-size:11px;margin-top:4px;white-space:pre-wrap;color:var(--text2)">${esc(typeof v==='string'?v:JSON.stringify(v,null,2))}</pre></div>`).join('')}
+      ${res.errors?.length ? `<div style="margin-top:8px;color:var(--red);font-size:11px">${res.errors.map(e=>esc(JSON.stringify(e))).join('<br>')}</div>` : ''}
+    </div>`;
+  } catch(e) { el.innerHTML = `<div class="card"><div class="empty" style="color:var(--red)">${esc(e.message)}</div></div>`; }
+}
+
+async function runBatch() {
+  const agent = $('batch-agent').value.trim();
+  const queries = $('batch-queries').value.split('\n').map(q=>q.trim()).filter(Boolean);
+  const conc = parseInt($('batch-conc').value) || 3;
+  if (!agent) { toast('Enter agent ID', 'err'); return; }
+  if (!queries.length) { toast('Enter at least one query', 'err'); return; }
+  const el = $('pipeline-results');
+  el.innerHTML = '<div class="card"><div class="empty">Running batch...</div></div>';
+  try {
+    const res = await api('POST', '/api/pipelines/batch', {agent_id: agent, queries, max_concurrency: conc});
+    el.innerHTML = `<div class="card"><div class="card-title">Batch Results (${res.results.length})</div>
+      <table style="width:100%;font-size:11px;border-collapse:collapse;margin-top:8px">
+      <tr style="color:var(--muted);text-align:left"><th style="padding:4px">Query</th><th>Status</th><th>Latency</th><th>Response</th></tr>
+      ${res.results.map(r => `<tr style="border-top:1px solid var(--border)">
+        <td style="padding:4px;color:var(--text2)">${esc(r.query.slice(0,50))}</td>
+        <td>${r.success?'<span style="color:var(--green)">OK</span>':'<span style="color:var(--red)">FAIL</span>'}</td>
+        <td style="color:var(--muted)">${r.latency_ms}ms</td>
+        <td style="color:var(--text2);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc((r.content||'').slice(0,80))}</td>
+      </tr>`).join('')}
+      </table></div>`;
+  } catch(e) { el.innerHTML = `<div class="card"><div class="empty" style="color:var(--red)">${esc(e.message)}</div></div>`; }
+}
+
+async function loadTemplates() {
+  const el = $('templates-list');
+  try {
+    const {templates} = await api('GET', '/api/pipelines/templates');
+    if (!templates.length) { el.innerHTML = '<div class="empty">No templates</div>'; return; }
+    el.innerHTML = templates.map(t => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
+        <div>
+          <strong style="font-size:12px;color:var(--green)">${esc(t.name)}</strong>
+          <div style="font-size:10px;color:var(--text2);margin-top:2px">${esc(t.system_prompt)}</div>
+          ${t.channels.length ? `<div style="font-size:10px;color:var(--muted)">${t.channels.map(c=>'#'+c).join(' ')}</div>` : ''}
+        </div>
+        <button class="tbtn" onclick="createFromTemplate('${esc(t.name)}')" style="font-size:10px;white-space:nowrap">Create Agent</button>
+      </div>`).join('');
+  } catch(e) { el.innerHTML = `<div class="empty" style="color:var(--red)">${esc(e.message)}</div>`; }
+}
+
+async function createFromTemplate(templateName) {
+  const agentId = prompt(`Agent ID for template "${templateName}":`);
+  if (!agentId) return;
+  try {
+    await api('POST', `/api/pipelines/templates/create?agent_id=${encodeURIComponent(agentId)}&template_name=${encodeURIComponent(templateName)}`);
+    toast(`Agent "${agentId}" created from template`, 'ok');
+    loadAgents();
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+// ══════════════════════════════════════════
+//  Guardrails & Eval
+// ══════════════════════════════════════════
+async function loadGuardrails() {
+  try {
+    const {guardrails} = await api('GET', '/api/guardrails/available');
+    const el = $('guard-checks');
+    el.innerHTML = Object.entries(guardrails).map(([k,v]) => `
+      <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text2);cursor:pointer">
+        <input type="checkbox" class="guard-chk" value="${k}" ${['keyword','pii','length'].includes(k)?'checked':''}>
+        ${esc(v.name)}
+      </label>`).join('');
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+async function checkGuardrails(direction) {
+  const text = $('guard-text').value.trim();
+  if (!text) { toast('Enter text to check', 'err'); return; }
+  const guardrails = [...document.querySelectorAll('.guard-chk:checked')].map(c => c.value);
+  if (!guardrails.length) { toast('Select at least one guardrail', 'err'); return; }
+  const el = $('guard-results');
+  el.innerHTML = '<div class="empty">Checking...</div>';
+  try {
+    const res = await api('POST', `/api/guardrails/check/${direction}`, {text, guardrails});
+    el.innerHTML = `
+      <div style="padding:8px;border-radius:var(--r);background:${res.passed?'rgba(74,222,128,.1)':'rgba(248,113,113,.1)'};border:1px solid ${res.passed?'var(--green)':'var(--red)'};margin-bottom:8px">
+        <strong style="color:${res.passed?'var(--green)':'var(--red)'}">
+          ${res.passed ? '&#x2705; All checks passed' : '&#x274C; Some checks failed'}
+        </strong>
+      </div>
+      ${res.results.map(r => `
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:11px;border-bottom:1px solid var(--border)">
+          <span style="color:${r.passed?'var(--green)':'var(--red)'}">
+            ${r.passed ? '&#x2705;' : '&#x274C;'}
+          </span>
+          <strong style="color:var(--text)">${esc(r.guardrail)}</strong>
+          <span style="color:var(--text2)">${esc(r.message)}</span>
+        </div>`).join('')}`;
+  } catch(e) { el.innerHTML = `<div class="empty" style="color:var(--red)">${esc(e.message)}</div>`; }
+}
+
+function addEvalCase() {
+  const container = $('eval-cases');
+  const div = document.createElement('div');
+  div.className = 'eval-case';
+  div.style.cssText = 'display:grid;grid-template-columns:1fr 1fr .3fr;gap:6px;margin-bottom:6px';
+  div.innerHTML = `
+    <input placeholder="Query" class="ec-query" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace">
+    <input placeholder="Expected (substring match)" class="ec-expected" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace">
+    <button class="tbtn" onclick="this.closest('.eval-case').remove()" style="font-size:10px">&#x2716;</button>`;
+  container.appendChild(div);
+}
+
+async function runEval() {
+  const agentId = $('eval-agent').value.trim();
+  if (!agentId) { toast('Enter agent ID', 'err'); return; }
+  const cases = [];
+  document.querySelectorAll('.eval-case').forEach(row => {
+    const query = row.querySelector('.ec-query').value.trim();
+    const expected = row.querySelector('.ec-expected').value.trim();
+    if (query) cases.push({query, expected});
+  });
+  if (!cases.length) { toast('Add at least one test case', 'err'); return; }
+  const el = $('eval-results');
+  el.innerHTML = '<div class="empty">Running evaluation...</div>';
+  try {
+    const res = await api('POST', '/api/guardrails/eval', {agent_id: agentId, test_cases: cases});
+    el.innerHTML = `
+      <div style="padding:8px;border-radius:var(--r);background:var(--bg3);margin-bottom:8px;font-size:12px">
+        <strong>${res.passed}/${res.total} passed</strong>
+        <span style="color:var(--muted);margin-left:8px">${res.failed} failed</span>
+      </div>
+      <table style="width:100%;font-size:11px;border-collapse:collapse">
+      <tr style="color:var(--muted);text-align:left"><th style="padding:4px">Query</th><th>Expected</th><th>Result</th><th>Match</th><th>Latency</th></tr>
+      ${res.results.map(r => `<tr style="border-top:1px solid var(--border)">
+        <td style="padding:4px;color:var(--text2)">${esc(r.query.slice(0,40))}</td>
+        <td style="color:var(--muted)">${esc((r.expected||'').slice(0,30))}</td>
+        <td style="color:var(--text2);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc((r.actual||r.error||'').slice(0,60))}</td>
+        <td>${r.match ? '<span style="color:var(--green)">&#x2705;</span>' : '<span style="color:var(--red)">&#x274C;</span>'}</td>
+        <td style="color:var(--muted)">${r.latency_ms}ms</td>
+      </tr>`).join('')}
+      </table>`;
+  } catch(e) { el.innerHTML = `<div class="empty" style="color:var(--red)">${esc(e.message)}</div>`; }
+}
+
+// ══════════════════════════════════════════
+//  Observability (Costs, Traces, Prompts)
+// ══════════════════════════════════════════
+async function loadObserve() {
+  try {
+    const [costs, entries] = await Promise.all([
+      api('GET', '/api/observe/costs'),
+      api('GET', '/api/observe/costs/entries?limit=20'),
+    ]);
+    $('obs-queries').textContent = costs.total_queries;
+    $('obs-cost').textContent = '$' + costs.total_cost_usd.toFixed(4);
+    $('obs-tokens').textContent = ((costs.total_input_tokens + costs.total_output_tokens) / 1000).toFixed(1) + 'k';
+    $('obs-latency').textContent = costs.avg_latency_ms.toFixed(0) + 'ms';
+
+    // By agent breakdown
+    const agentEl = $('obs-by-agent');
+    const agents = Object.entries(costs.by_agent || {});
+    if (agents.length) {
+      agentEl.innerHTML = agents.map(([id, cost]) => `
+        <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:11px">
+          <span style="color:var(--text)">${esc(id)}</span>
+          <span style="color:var(--yellow)">$${cost.toFixed(4)}</span>
+        </div>`).join('');
+    } else { agentEl.innerHTML = '<div class="empty">No data yet</div>'; }
+
+    // Recent entries
+    const entEl = $('obs-entries');
+    if (entries.entries?.length) {
+      entEl.innerHTML = `<table style="width:100%;font-size:11px;border-collapse:collapse">
+        <tr style="color:var(--muted);text-align:left"><th style="padding:4px">Time</th><th>Agent</th><th>Model</th><th>Tokens</th><th>Cost</th><th>Latency</th></tr>
+        ${entries.entries.map(e => `<tr style="border-top:1px solid var(--border)">
+          <td style="padding:4px;color:var(--text2)">${new Date(e.timestamp).toLocaleTimeString()}</td>
+          <td style="color:var(--green)">${esc(e.agent_id)}</td>
+          <td style="color:var(--muted)">${esc(e.model)}</td>
+          <td style="color:var(--text2)">${e.input_tokens}/${e.output_tokens}</td>
+          <td style="color:var(--yellow)">$${e.cost_usd.toFixed(4)}</td>
+          <td style="color:var(--muted)">${e.latency_ms}ms</td>
+        </tr>`).join('')}
+      </table>`;
+    } else { entEl.innerHTML = '<div class="empty">No entries</div>'; }
+  } catch(e) {
+    $('obs-by-agent').innerHTML = `<div class="empty" style="color:var(--red)">${esc(e.message)}</div>`;
+  }
+}
+
+async function clearCosts() {
+  if (!confirm('Clear all cost tracking data?')) return;
+  try { await api('DELETE', '/api/observe/costs'); toast('Costs cleared', 'ok'); loadObserve(); }
+  catch(e) { toast(e.message, 'err'); }
+}
+
+async function savePrompt() {
+  const name = $('prompt-name').value.trim();
+  const content = $('prompt-content').value.trim();
+  const tags = $('prompt-tags').value.split(',').map(t=>t.trim()).filter(Boolean);
+  if (!name || !content) { toast('Name and content required', 'err'); return; }
+  try {
+    const res = await api('POST', '/api/observe/prompts', {name, content, tags});
+    toast(`Prompt "${name}" v${res.version} saved`, 'ok');
+    loadPrompts();
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+async function loadPrompts() {
+  const el = $('prompts-list');
+  try {
+    const {prompts} = await api('GET', '/api/observe/prompts');
+    if (!prompts.length) { el.innerHTML = '<div class="empty">No prompts saved</div>'; return; }
+    let html = '';
+    for (const name of prompts) {
+      const {versions} = await api('GET', `/api/observe/prompts/${encodeURIComponent(name)}/versions`);
+      html += `<div style="margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:8px">
+        <strong style="color:var(--green);font-size:12px">${esc(name)}</strong>
+        <span class="badge" style="margin-left:6px">${versions.length} versions</span>
+        ${versions.map(v => `<div style="font-size:10px;color:var(--text2);margin-top:3px;cursor:pointer" onclick="$('prompt-name').value='${esc(name)}';$('prompt-content').value=this.dataset.content" data-content="${esc(v.content)}">
+          v${v.version}: ${esc(v.content.slice(0,80))}... ${v.tags?.length ? v.tags.map(t=>`<span class="badge">${esc(t)}</span>`).join(' ') : ''}
+        </div>`).join('')}
+      </div>`;
+    }
+    el.innerHTML = html;
+  } catch(e) { el.innerHTML = `<div class="empty" style="color:var(--red)">${esc(e.message)}</div>`; }
+}
+
+// ══════════════════════════════════════════
+//  Config
+// ══════════════════════════════════════════
+async function loadConfig() {
+  try {
+    const data = await api('GET','/api/config');
+    $('config-editor').value = JSON.stringify(data.config, null, 2);
+    configHash = data.hash;
+    $('config-hash').textContent = configHash ? 'hash: ' + configHash.slice(0,8) : '--';
+  } catch(e) {
+    $('config-editor').value = '// Error: ' + e.message;
+  }
+}
+
+async function saveConfig() {
+  try {
+    const raw = $('config-editor').value;
+    const config = JSON.parse(raw);
+    await api('PATCH','/api/config', {config, base_hash:configHash});
+    toast('Config saved','ok');
+    loadConfig();
+  } catch(e) {
+    toast(e.message,'err');
+  }
+}
+
+// ══════════════════════════════════════════
+//  Channels
+// ══════════════════════════════════════════
+async function loadChannels() {
+  const el = $('channels-content');
+  try {
+    const data = await api('GET','/api/channels');
+    const channels = data.channels || data;
+
+    // channelMeta is an array of {id, label, detailLabel, systemImage}
+    // channels is an object keyed by channel id with status info
+    const meta = data.channelMeta || [];
+    const statuses = data.channels || {};
+    if (Array.isArray(meta) && meta.length) {
+      let html = '';
+      for (const ch of meta) {
+        const id = ch.id || '';
+        const label = ch.label || id;
+        const detail = ch.detailLabel || '';
+        const status = statuses[id] || {};
+        const connected = status.connected || status.running || status.linked || false;
+        const badge = connected ? '<span class="status-badge ok">Connected</span>' : '<span class="status-badge warn">Disconnected</span>';
+        const lastError = status.lastError ? `<div style="color:var(--red);font-size:0.85em;margin-top:4px">Error: ${esc(status.lastError)}</div>` : '';
+        const statusInfo = [];
+        if (status.mode) statusInfo.push(`Mode: ${status.mode}`);
+        if (status.tokenSource) statusInfo.push(`Token: ${status.tokenSource}`);
+        if (status.configured !== undefined) statusInfo.push(status.configured ? 'Configured' : 'Not configured');
+        html += `<div class="card">
+          <div class="card-title">${esc(label)} (${esc(id)}) ${badge}</div>
+          <div style="color:var(--text-dim);font-size:0.85em">${esc(detail)}</div>
+          ${statusInfo.length ? `<div style="margin-top:6px;font-size:0.85em">${statusInfo.join(' · ')}</div>` : ''}
+          ${lastError}
+          <div style="margin-top:8px;display:flex;gap:6px">
+            ${!connected ? `<button class="tbtn primary" onclick="loginChannel('${esc(id)}')">Login</button>` : ''}
+            ${connected ? `<button class="tbtn danger" onclick="logoutChannel('${esc(id)}')">Logout</button>` : ''}
+          </div>
+        </div>`;
+      }
+      el.innerHTML = html;
+    } else if (typeof data === 'object') {
+      // Fallback: show raw data
+      el.innerHTML = `<div class="card"><div class="json-view">${esc(JSON.stringify(data, null, 2))}</div></div>`;
+    } else {
+      el.innerHTML = '<div class="empty">No channels configured</div>';
+    }
+  } catch(e) {
+    el.innerHTML = `<div class="card"><div style="color:var(--red)">${esc(e.message)}</div></div>`;
+  }
+}
+
+async function loginChannel(name) {
+  try {
+    const data = await api('POST',`/api/channels/${name}/login`);
+    if (data.qrDataUrl || data.qr) {
+      const qrUrl = data.qrDataUrl || data.qr;
+      toast('QR code received — scan with your phone','ok');
+      const el = $('channels-content');
+      el.innerHTML = `<div class="card" style="text-align:center">
+        <div class="card-title">Scan QR Code with ${esc(name)}</div>
+        <div style="margin:16px 0">
+          <img src="${qrUrl}" alt="QR Code" style="width:280px;height:280px;border-radius:8px;background:#fff;padding:12px">
+        </div>
+        <div style="color:var(--text-dim);font-size:0.9em;margin-bottom:12px">
+          Open ${esc(name)} on your phone &rarr; Linked Devices &rarr; Link a Device &rarr; Scan this QR
+        </div>
+        <div style="display:flex;gap:8px;justify-content:center">
+          <button class="tbtn primary" onclick="waitForLogin('${esc(name)}')">Check Status</button>
+          <button class="tbtn" onclick="loadChannels()">Cancel</button>
+        </div>
+      </div>`;
+    } else {
+      toast('Login started','ok');
+      loadChannels();
+    }
+  } catch(e) { toast(e.message,'err'); }
+}
+
+async function waitForLogin(name) {
+  toast('Waiting for QR scan...','ok');
+  try {
+    const data = await api('POST',`/api/channels/${name}/login/wait?timeout_ms=30000`);
+    if (data.connected) {
+      toast('Connected successfully!','ok');
+    } else {
+      toast(data.message || 'Still waiting — try scanning again','warn');
+    }
+  } catch(e) { toast(e.message || 'Timeout waiting for scan','warn'); }
+  loadChannels();
+}
+
+async function logoutChannel(name) {
+  if (!confirm(`Log out of ${name}?`)) return;
+  try { await api('POST',`/api/channels/${name}/logout`); toast('Logged out','ok'); loadChannels(); }
+  catch(e) { toast(e.message,'err'); }
+}
+
+// ══════════════════════════════════════════
+//  Schedules
+// ══════════════════════════════════════════
+async function loadSchedules() {
+  const el = $('schedules-content');
+  try {
+    const {schedules} = await api('GET','/api/schedules');
+    if (!schedules || !schedules.length) {
+      el.innerHTML = '<div class="empty">No scheduled jobs</div>';
+      return;
+    }
+
+    let html = '<table class="data-table"><thead><tr><th>Name</th><th>Cron</th><th>Agent</th><th>Status</th><th>Next Run</th><th>Actions</th></tr></thead><tbody>';
+    for (const j of schedules) {
+      const badge = j.enabled ? '<span class="status-badge ok">Enabled</span>' : '<span class="status-badge warn">Disabled</span>';
+      const next = j.next_run ? new Date(j.next_run).toLocaleString() : '--';
+      html += `<tr>
+        <td>${esc(j.name||j.id)}</td>
+        <td>${esc(fmtCron(j.schedule||j.cron||''))}</td>
+        <td>${esc(j.session_target||j.agent_id||'')}</td>
+        <td>${badge}</td>
+        <td>${next}</td>
+        <td>
+          <button class="tbtn primary" onclick="runNow('${esc(j.id)}')">Run</button>
+          <button class="tbtn danger" onclick="deleteSchedule('${esc(j.id)}')">Delete</button>
+        </td>
+      </tr>`;
+    }
+    html += '</tbody></table>';
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = `<div class="card"><div style="color:var(--red)">${esc(e.message)}</div></div>`;
+  }
+}
+
+async function createSchedule() {
+  const name = $('s-name').value.trim();
+  const cron = $('s-cron').value.trim();
+  const agent = $('s-agent').value.trim();
+  const message = $('s-message').value.trim();
+  if (!name || !cron || !agent || !message) return toast('All fields required','err');
+  try {
+    await api('POST','/api/schedules', {name, cron, agent_id:agent, message});
+    closeModals(); toast('Schedule created','ok'); loadSchedules();
+  } catch(e) { toast(e.message,'err'); }
+}
+
+async function runNow(id) {
+  try { await api('POST',`/api/schedules/${id}/run`); toast('Job triggered','ok'); }
+  catch(e) { toast(e.message,'err'); }
+}
+
+async function deleteSchedule(id) {
+  if (!confirm('Delete this schedule?')) return;
+  try { await api('DELETE',`/api/schedules/${id}`); toast('Schedule deleted','ok'); loadSchedules(); }
+  catch(e) { toast(e.message,'err'); }
+}
+
+// ══════════════════════════════════════════
+//  System
+// ══════════════════════════════════════════
+async function loadSystem() {
+  const el = $('system-content');
+  let html = '';
+
+  // Health
+  try {
+    const h = await api('GET','/api/health');
+    const badge = h.healthy ? '<span class="status-badge ok">Healthy</span>' : '<span class="status-badge err">Unhealthy</span>';
+    html += `<div class="card">
+      <div class="card-title">Gateway Health ${badge}</div>
+      <div class="json-view">${esc(JSON.stringify(h, null, 2))}</div>
+    </div>`;
+  } catch(e) {
+    html += `<div class="card"><div class="card-title">Gateway Health <span class="status-badge err">Error</span></div><div style="color:var(--red)">${esc(e.message)}</div></div>`;
+  }
+
+  // Nodes
+  try {
+    const nodes = await api('GET','/api/ops/nodes');
+    html += `<div class="card">
+      <div class="card-title">Nodes</div>
+      <div class="json-view">${esc(JSON.stringify(nodes, null, 2))}</div>
+    </div>`;
+  } catch(e) {
+    html += `<div class="card"><div class="card-title">Nodes</div><div style="color:var(--muted)">Not available</div></div>`;
+  }
+
+  // Logs
+  try {
+    const logs = await api('GET','/api/ops/logs');
+    const lines = logs.lines || logs.entries || [];
+    let logHtml = '';
+    if (Array.isArray(lines) && lines.length) {
+      logHtml = lines.slice(-50).map(l => {
+        try {
+          const obj = typeof l === 'string' ? JSON.parse(l) : l;
+          const meta = obj._meta || {};
+          const time = (meta.date || obj.time || '').replace(/T/, ' ').replace(/\.\d+Z$/, '');
+          const level = (meta.logLevelName || '').toUpperCase();
+          const subsystem = (obj['0'] || '').replace(/[{}"]/g, '').replace('subsystem:', '');
+          const msg = obj['1'] || '';
+          const msgStr = stripAnsi(typeof msg === 'string' ? msg : JSON.stringify(msg));
+          const levelClass = level === 'ERROR' ? 'color:var(--red)' : level === 'WARN' ? 'color:var(--yellow)' : '';
+          return `<span style="color:var(--muted)">${esc(time)}</span> <span style="${levelClass}">[${esc(level||'LOG')}]</span> <span style="color:var(--blue)">${esc(subsystem)}</span> ${esc(msgStr)}`;
+        } catch(_) { return esc(stripAnsi(typeof l === 'string' ? l : JSON.stringify(l))); }
+      }).join('\n');
+    } else {
+      logHtml = esc(JSON.stringify(logs, null, 2));
+    }
+    html += `<div class="card">
+      <div class="card-title">Recent Logs</div>
+      <div class="json-view" style="max-height:300px">${logHtml}</div>
+    </div>`;
+  } catch(e) {
+    html += `<div class="card"><div class="card-title">Logs</div><div style="color:var(--muted)">Not available</div></div>`;
+  }
+
+  // Approvals
+  html += `<div class="card">
+    <div class="card-title">Approvals <button class="tbtn" onclick="openModal('approval')" style="margin-left:auto">Resolve</button></div>
+    <div style="color:var(--muted);font-size:12px">Approvals arrive as push events. Use the Resolve button to approve or deny a pending request by ID.</div>
+  </div>`;
+
+  // Devices
+  html += `<div class="card">
+    <div class="card-title">Device Token Management</div>
+    <div class="inline-form">
+      <input id="dev-id" placeholder="Device ID" style="width:150px">
+      <input id="dev-role" placeholder="Role" style="width:100px" value="default">
+      <button class="tbtn" onclick="rotateToken()">Rotate</button>
+      <button class="tbtn danger" onclick="revokeToken()">Revoke</button>
+    </div>
+  </div>`;
+
+  el.innerHTML = html;
+}
+
+async function rotateToken() {
+  const did = $('dev-id').value.trim(), role = $('dev-role').value.trim();
+  if (!did) return toast('Device ID required','err');
+  try { await api('POST','/api/ops/devices/rotate-token', {device_id:did, role:role||'default'}); toast('Token rotated','ok'); }
+  catch(e) { toast(e.message,'err'); }
+}
+
+async function revokeToken() {
+  const did = $('dev-id').value.trim(), role = $('dev-role').value.trim();
+  if (!did || !confirm('Revoke token? This is irreversible.')) return;
+  try { await api('POST','/api/ops/devices/revoke-token', {device_id:did, role:role||'default'}); toast('Token revoked','ok'); }
+  catch(e) { toast(e.message,'err'); }
+}
+
+// ══════════════════════════════════════════
+//  Audit
+// ══════════════════════════════════════════
+async function loadAudit() {
+  const agentId = $('audit-agent')?.value?.trim() || undefined;
+  const eventType = $('audit-type')?.value?.trim() || undefined;
+  try {
+    let url = '/api/audit/events?limit=100';
+    if (agentId) url += `&agent_id=${encodeURIComponent(agentId)}`;
+    if (eventType) url += `&event_type=${encodeURIComponent(eventType)}`;
+    const res = await api('GET', url);
+    $('audit-count').textContent = res.count;
+    const el = $('audit-events');
+    if (!res.events.length) { el.innerHTML = '<div class="empty">No events found</div>'; return; }
+    el.innerHTML = `<table class="data-table"><thead><tr><th>Time</th><th>Type</th><th>Agent</th><th>Action</th><th>Resource</th><th>Status</th></tr></thead><tbody>
+      ${res.events.map(e => `<tr>
+        <td>${new Date(e.timestamp).toLocaleTimeString()}</td>
+        <td><span class="status-badge info">${esc(e.event_type)}</span></td>
+        <td>${esc(e.agent_id||'--')}</td>
+        <td>${esc(e.action||'--')}</td>
+        <td>${esc(e.resource||'--')}</td>
+        <td>${e.success ? '<span class="status-badge ok">OK</span>' : '<span class="status-badge err">FAIL</span>'}</td>
+      </tr>`).join('')}</tbody></table>`;
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+async function logAuditEvent() {
+  const eventType = $('audit-log-type').value.trim();
+  if (!eventType) { toast('Event type required', 'err'); return; }
+  try {
+    await api('POST', '/api/audit/events', {
+      event_type: eventType,
+      agent_id: $('audit-log-agent').value.trim() || null,
+      action: $('audit-log-action').value.trim(),
+      resource: $('audit-log-resource').value.trim(),
+    });
+    toast('Event logged', 'ok');
+    loadAudit();
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+async function clearAudit() {
+  if (!confirm('Clear all audit events?')) return;
+  try { await api('DELETE', '/api/audit/events'); toast('Audit log cleared', 'ok'); loadAudit(); }
+  catch(e) { toast(e.message, 'err'); }
+}
+
+// ══════════════════════════════════════════
+//  Billing
+// ══════════════════════════════════════════
+async function loadBilling() {
+  try {
+    const [tiersRes, invoicesRes] = await Promise.all([
+      api('GET', '/api/billing/tiers'),
+      api('GET', '/api/billing/invoices'),
+    ]);
+    // Tiers
+    const tiersEl = $('billing-tiers');
+    if (tiersRes.tiers.length) {
+      tiersEl.innerHTML = `<table class="data-table"><thead><tr><th>Tenant</th><th>Tier</th><th>Input $/M</th><th>Output $/M</th><th>Included</th><th>Overage</th></tr></thead><tbody>
+        ${tiersRes.tiers.map(t => `<tr>
+          <td>${esc(t.tenant_id)}</td>
+          <td><span class="status-badge info">${esc(t.name)}</span></td>
+          <td>$${t.input_price_per_million.toFixed(2)}</td>
+          <td>$${t.output_price_per_million.toFixed(2)}</td>
+          <td>${t.included_queries}</td>
+          <td>$${t.overage_price_per_query.toFixed(3)}</td>
+        </tr>`).join('')}</tbody></table>`;
+    } else { tiersEl.innerHTML = '<div class="empty">No tiers configured</div>'; }
+    // Invoices
+    const invEl = $('billing-invoices');
+    if (invoicesRes.invoices.length) {
+      invEl.innerHTML = `<table class="data-table"><thead><tr><th>ID</th><th>Tenant</th><th>Period</th><th>Items</th><th>Total</th><th>Status</th></tr></thead><tbody>
+        ${invoicesRes.invoices.map(i => `<tr>
+          <td>${esc(i.invoice_id)}</td>
+          <td>${esc(i.tenant_id)}</td>
+          <td style="font-size:10px">${new Date(i.period_start).toLocaleDateString()} - ${new Date(i.period_end).toLocaleDateString()}</td>
+          <td>${i.line_items.length}</td>
+          <td style="color:var(--yellow)">$${i.total.toFixed(4)}</td>
+          <td><span class="status-badge ${i.status==='draft'?'warn':'ok'}">${esc(i.status)}</span></td>
+        </tr>`).join('')}</tbody></table>`;
+    } else { invEl.innerHTML = '<div class="empty">No invoices yet</div>'; }
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+async function addBillingTier() {
+  const tenantId = $('bill-tenant').value.trim();
+  const name = $('bill-tier-name').value.trim();
+  if (!tenantId || !name) { toast('Tenant ID and Tier Name required', 'err'); return; }
+  try {
+    await api('POST', '/api/billing/tiers', {
+      tenant_id: tenantId, name,
+      input_price_per_million: parseFloat($('bill-input-price').value) || 0,
+      output_price_per_million: parseFloat($('bill-output-price').value) || 0,
+      included_queries: parseInt($('bill-included').value) || 0,
+      overage_price_per_query: parseFloat($('bill-overage').value) || 0,
+    });
+    toast('Tier added', 'ok');
+    loadBilling();
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+async function recordBillingUsage() {
+  const tenantId = $('bill-use-tenant').value.trim();
+  const agentId = $('bill-use-agent').value.trim();
+  if (!tenantId || !agentId) { toast('Tenant ID and Agent ID required', 'err'); return; }
+  try {
+    await api('POST', '/api/billing/usage', {
+      tenant_id: tenantId, agent_id: agentId,
+      input_tokens: parseInt($('bill-use-input').value) || 0,
+      output_tokens: parseInt($('bill-use-output').value) || 0,
+    });
+    toast('Usage recorded', 'ok');
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+async function generateInvoice() {
+  const tenantId = $('bill-inv-tenant').value.trim();
+  const start = $('bill-inv-start').value;
+  const end = $('bill-inv-end').value;
+  if (!tenantId || !start || !end) { toast('All fields required', 'err'); return; }
+  try {
+    await api('POST', '/api/billing/invoices', {
+      tenant_id: tenantId,
+      period_start: new Date(start).toISOString(),
+      period_end: new Date(end).toISOString(),
+    });
+    toast('Invoice generated', 'ok');
+    loadBilling();
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+// ══════════════════════════════════════════
+//  Connectors
+// ══════════════════════════════════════════
+async function loadConnectors() {
+  try {
+    const {connectors} = await api('GET', '/api/connectors');
+    // Populate dropdowns
+    const sel1 = $('conn-type'), sel2 = $('conn-exec-type');
+    sel1.innerHTML = '<option value="">Select...</option>' + connectors.map(c => `<option value="${c.type}">${esc(c.name)}</option>`).join('');
+    sel2.innerHTML = '<option value="">Select...</option>' + connectors.filter(c=>c.connected).map(c => `<option value="${c.type}">${esc(c.name)}</option>`).join('');
+    // List
+    const el = $('connectors-list');
+    el.innerHTML = connectors.map(c => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+        <div>
+          <strong style="font-size:12px;color:var(--text)">${esc(c.name)}</strong>
+          <span class="status-badge ${c.connected?'ok':'warn'}" style="margin-left:8px">${c.connected?'Connected':'Not connected'}</span>
+          <div style="font-size:10px;color:var(--text2);margin-top:2px">${esc(c.description)}</div>
+          ${c.actions.length ? `<div style="font-size:10px;color:var(--muted);margin-top:2px">Actions: ${c.actions.map(a=>a.name).join(', ')}</div>` : ''}
+        </div>
+      </div>`).join('');
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+async function connectConnector() {
+  const type = $('conn-type').value;
+  const key = $('conn-key').value.trim();
+  if (!type) { toast('Select a connector type', 'err'); return; }
+  if (!key) { toast('API key required', 'err'); return; }
+  try {
+    await api('POST', `/api/connectors/${type}/connect`, {api_key: key});
+    toast(`${type} connected`, 'ok');
+    $('conn-key').value = '';
+    loadConnectors();
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+async function executeConnectorAction() {
+  const type = $('conn-exec-type').value;
+  const action = $('conn-action').value.trim();
+  if (!type || !action) { toast('Select connector and enter action', 'err'); return; }
+  let params = {};
+  try { const v = $('conn-params').value.trim(); if (v) params = JSON.parse(v); } catch { toast('Invalid params JSON', 'err'); return; }
+  const el = $('conn-result');
+  el.innerHTML = '<div class="empty">Executing...</div>';
+  try {
+    const res = await api('POST', `/api/connectors/${type}/execute`, {action, params});
+    if (res.success) {
+      el.innerHTML = `<div class="json-view">${esc(JSON.stringify(res.result, null, 2))}</div>`;
+    } else {
+      el.innerHTML = `<div style="color:var(--red);font-size:11px">${esc(res.error)}</div>`;
+    }
+  } catch(e) { el.innerHTML = `<div style="color:var(--red);font-size:11px">${esc(e.message)}</div>`; }
+}
+
+// ══════════════════════════════════════════
+//  Templates (dedicated tab)
+// ══════════════════════════════════════════
+async function loadTemplatesTab() {
+  try {
+    const {templates} = await api('GET', '/api/templates');
+    // Populate dropdown
+    const sel = $('tmpl-name');
+    sel.innerHTML = '<option value="">Select template...</option>' + templates.map(t => `<option value="${t.name}">${esc(t.name)}</option>`).join('');
+    // List
+    const el = $('templates-tab-list');
+    el.innerHTML = templates.map(t => `
+      <div style="padding:10px 0;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <strong style="font-size:13px;color:var(--green)">${esc(t.name)}</strong>
+          <div style="display:flex;gap:6px">
+            ${t.permission_mode === 'confirm' ? '<span class="status-badge warn">Confirm mode</span>' : ''}
+            ${t.enable_memory ? '<span class="status-badge info">Memory</span>' : ''}
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--text2);margin-top:4px;line-height:1.5">${esc(t.system_prompt.slice(0,180))}${t.system_prompt.length>180?'...':''}</div>
+        ${t.channels.length ? `<div style="font-size:10px;color:var(--muted);margin-top:4px">Channels: ${t.channels.map(c=>'#'+c).join(' ')}</div>` : ''}
+        <div style="font-size:10px;color:var(--muted);margin-top:2px">Tool Policy: ${esc(t.tool_policy)}</div>
+      </div>`).join('');
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+async function createFromTemplateTab() {
+  const name = $('tmpl-name').value;
+  const agentId = $('tmpl-agent-id').value.trim();
+  if (!name) { toast('Select a template', 'err'); return; }
+  if (!agentId) { toast('Enter an agent ID', 'err'); return; }
+  try {
+    const res = await api('POST', `/api/templates/${encodeURIComponent(name)}/create?agent_id=${encodeURIComponent(agentId)}`);
+    if (res.error) { toast(res.error, 'err'); return; }
+    toast(`Agent "${agentId}" created from ${name}`, 'ok');
+    loadAgents();
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+// ══════════════════════════════════════════
+//  Workflows
+// ══════════════════════════════════════════
+let workflowPresets = [];
+async function loadWorkflows() {
+  try {
+    const [presetsRes, statusRes] = await Promise.all([
+      api('GET', '/api/workflows/presets'),
+      api('GET', '/api/workflows/status'),
+    ]);
+    workflowPresets = presetsRes.presets;
+    // Populate preset dropdown
+    const sel = $('wf-preset');
+    sel.innerHTML = '<option value="">Select preset...</option>' + workflowPresets.map(p => `<option value="${p.key}">${esc(p.name)}</option>`).join('');
+    // Presets list
+    const el = $('workflows-presets');
+    el.innerHTML = workflowPresets.map(p => `
+      <div style="padding:8px 0;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:8px">
+          <strong style="font-size:12px;color:var(--green)">${esc(p.name)}</strong>
+          <span class="badge">${esc(p.key)}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text2);margin-top:4px">${esc(p.description)}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px">Agents: ${p.required_params.join(', ')} | Context: ${p.context_keys.join(', ')}</div>
+      </div>`).join('');
+    // Status
+    const statusEl = $('workflows-status');
+    const entries = Object.entries(statusRes.workflows||{});
+    if (entries.length) {
+      statusEl.innerHTML = entries.map(([k,v]) => `
+        <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:11px">
+          <span style="color:var(--text)">${esc(k)}</span>
+          <span class="status-badge ${v.status==='completed'?'ok':v.status==='running'?'info':'err'}">${esc(v.status)}</span>
+        </div>`).join('');
+    } else { statusEl.innerHTML = '<div class="empty">No workflows run yet</div>'; }
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+function onWorkflowPresetChange() {
+  const key = $('wf-preset').value;
+  const preset = workflowPresets.find(p => p.key === key);
+  const el = $('wf-agents-fields');
+  if (!preset) { el.innerHTML = ''; return; }
+  el.innerHTML = preset.required_params.map(p => `
+    <div style="margin-bottom:4px">
+      <label style="font-size:10px;color:var(--muted)">${esc(p)}</label>
+      <input class="wf-agent-input" data-param="${esc(p)}" placeholder="agent-id" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:5px 7px;font-size:11px;font-family:'JetBrains Mono',monospace">
+    </div>`).join('');
+}
+
+async function runWorkflow() {
+  const preset = $('wf-preset').value;
+  if (!preset) { toast('Select a preset', 'err'); return; }
+  const agentIds = {};
+  document.querySelectorAll('.wf-agent-input').forEach(inp => {
+    const val = inp.value.trim();
+    if (val) agentIds[inp.dataset.param] = val;
+  });
+  let context = {};
+  try { const v = $('wf-context').value.trim(); if (v) context = JSON.parse(v); } catch { toast('Invalid context JSON', 'err'); return; }
+  const el = $('workflow-results');
+  el.innerHTML = '<div class="card"><div class="empty">Running workflow...</div></div>';
+  try {
+    const res = await api('POST', '/api/workflows/run', {preset, agent_ids: agentIds, context});
+    if (res.error) { el.innerHTML = `<div class="card"><div class="empty" style="color:var(--red)">${esc(res.error)}</div></div>`; return; }
+    el.innerHTML = `<div class="card">
+      <div class="card-title">${res.success ? '&#x2705;' : '&#x274C;'} ${esc(res.workflow)} <span class="badge">${res.latency_ms}ms</span></div>
+      ${res.final_output ? `<div style="margin-top:8px"><strong style="color:var(--green);font-size:11px">Final Output:</strong><pre style="background:var(--bg);padding:8px;border-radius:var(--r);font-size:11px;margin-top:4px;white-space:pre-wrap;color:var(--text2)">${esc(typeof res.final_output==='string'?res.final_output:JSON.stringify(res.final_output,null,2))}</pre></div>` : ''}
+      <div style="margin-top:8px"><strong style="color:var(--text2);font-size:11px">Steps:</strong>
+        <table class="data-table" style="margin-top:4px"><thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Result</th></tr></thead><tbody>
+        ${(res.steps||[]).map(s => `<tr>
+          <td>${esc(s.name)}</td>
+          <td><span class="badge">${esc(s.step_type)}</span></td>
+          <td><span class="status-badge ${s.status==='completed'?'ok':s.status==='running'?'info':'err'}">${esc(s.status)}</span></td>
+          <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(String(s.result||'').slice(0,80))}</td>
+        </tr>`).join('')}
+        </tbody></table>
+      </div>
+    </div>`;
+    loadWorkflows();
+  } catch(e) { el.innerHTML = `<div class="card"><div class="empty" style="color:var(--red)">${esc(e.message)}</div></div>`; }
+}
+
+// ══════════════════════════════════════════
+//  Webhooks
+// ══════════════════════════════════════════
+async function loadWebhooks() {
+  try {
+    const [whRes, delRes] = await Promise.all([
+      api('GET', '/api/webhooks'),
+      api('GET', '/api/webhooks/deliveries?limit=50'),
+    ]);
+    // Webhooks list
+    const el = $('webhooks-list');
+    if (whRes.webhooks.length) {
+      el.innerHTML = `<table class="data-table"><thead><tr><th>Name</th><th>URL</th><th>Events</th><th>Retries</th><th>Secret</th><th>Actions</th></tr></thead><tbody>
+        ${whRes.webhooks.map(w => `<tr>
+          <td style="color:var(--green)">${esc(w.name)}</td>
+          <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(w.url)}</td>
+          <td>${w.events.length ? w.events.map(e=>`<span class="badge" style="margin-right:2px">${esc(e)}</span>`).join('') : '<span class="badge">all</span>'}</td>
+          <td>${w.max_retries}</td>
+          <td>${w.secret_set ? '<span class="status-badge ok">Set</span>' : '<span class="status-badge warn">None</span>'}</td>
+          <td>
+            <button class="tbtn" onclick="testWebhook('${esc(w.name)}')" style="font-size:10px">Test</button>
+            <button class="tbtn danger" onclick="deleteWebhook('${esc(w.name)}')" style="font-size:10px">Delete</button>
+          </td>
+        </tr>`).join('')}</tbody></table>`;
+    } else { el.innerHTML = '<div class="empty">No webhooks registered</div>'; }
+    // Deliveries
+    const delEl = $('webhooks-deliveries');
+    if (delRes.deliveries.length) {
+      delEl.innerHTML = `<table class="data-table"><thead><tr><th>Time</th><th>Webhook</th><th>Event</th><th>Status</th><th>Attempts</th><th>HTTP</th><th>Error</th></tr></thead><tbody>
+        ${delRes.deliveries.map(d => `<tr>
+          <td>${new Date(d.created_at).toLocaleTimeString()}</td>
+          <td style="color:var(--green)">${esc(d.webhook_name)}</td>
+          <td><span class="badge">${esc(d.event_type)}</span></td>
+          <td><span class="status-badge ${d.status==='success'?'ok':d.status==='pending'?'info':'err'}">${esc(d.status)}</span></td>
+          <td>${d.attempts}/${d.max_attempts}</td>
+          <td>${d.response_status||'--'}</td>
+          <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--red)">${esc(d.error||'')}</td>
+        </tr>`).join('')}</tbody></table>`;
+    } else { delEl.innerHTML = '<div class="empty">No deliveries</div>'; }
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+async function registerWebhook() {
+  const name = $('wh-name').value.trim();
+  const url = $('wh-url').value.trim();
+  if (!name || !url) { toast('Name and URL required', 'err'); return; }
+  const eventsStr = $('wh-events').value.trim();
+  const events = eventsStr ? eventsStr.split(',').map(s=>s.trim()).filter(Boolean) : [];
+  const secret = $('wh-secret').value.trim() || null;
+  try {
+    const res = await api('POST', '/api/webhooks', {name, url, events, secret});
+    if (res.error) { toast(res.error, 'err'); return; }
+    toast('Webhook registered', 'ok');
+    $('wh-name').value = ''; $('wh-url').value = ''; $('wh-events').value = ''; $('wh-secret').value = '';
+    loadWebhooks();
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+async function deleteWebhook(name) {
+  if (!confirm(`Delete webhook "${name}"?`)) return;
+  try { await api('DELETE', `/api/webhooks/${encodeURIComponent(name)}`); toast('Webhook removed', 'ok'); loadWebhooks(); }
+  catch(e) { toast(e.message, 'err'); }
+}
+
+async function testWebhook(name) {
+  try {
+    const res = await api('POST', `/api/webhooks/${encodeURIComponent(name)}/test`, {event_type:'test.ping', payload:{message:'Test ping'}});
+    if (res.delivered) toast(`Test delivered (HTTP ${res.response_status})`, 'ok');
+    else toast(`Test failed: ${res.error||res.status}`, 'err');
+    loadWebhooks();
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+// ══════════════════════════════════════════
+//  Autonomous
+// ══════════════════════════════════════════
+async function loadAutonomous() {
+  try {
+    const [budgetRes, goalsRes] = await Promise.all([
+      api('GET', '/api/autonomous/budget'),
+      api('GET', '/api/autonomous/goals'),
+    ]);
+    // Budget cards
+    $('auto-cost-remain').textContent = budgetRes.remaining_cost !== null ? '$' + budgetRes.remaining_cost.toFixed(2) : 'Unlimited';
+    $('auto-tokens-remain').textContent = budgetRes.remaining_tokens !== null ? (budgetRes.remaining_tokens/1000).toFixed(0) + 'k' : 'Unlimited';
+    $('auto-cost-spent').textContent = '$' + budgetRes.cost_spent.toFixed(4);
+    const exhaustEl = $('auto-exhausted');
+    exhaustEl.textContent = budgetRes.is_exhausted ? 'EXHAUSTED' : 'OK';
+    exhaustEl.style.color = budgetRes.is_exhausted ? 'var(--red)' : 'var(--green)';
+    // Goals list
+    const goalsEl = $('autonomous-goals');
+    if (goalsRes.goals.length) {
+      goalsEl.innerHTML = `<table class="data-table"><thead><tr><th>Description</th><th>Status</th><th>Max Steps</th><th>Result</th></tr></thead><tbody>
+        ${goalsRes.goals.map(g => `<tr>
+          <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(g.description)}</td>
+          <td><span class="status-badge ${g.status==='completed'?'ok':g.status==='in_progress'?'info':g.status==='pending'?'warn':'err'}">${esc(g.status)}</span></td>
+          <td>${g.max_steps}</td>
+          <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc((g.result||'--').slice(0,60))}</td>
+        </tr>`).join('')}</tbody></table>`;
+    } else { goalsEl.innerHTML = '<div class="empty">No goals created yet</div>'; }
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+async function createGoal() {
+  const desc = $('auto-goal-desc').value.trim();
+  const maxSteps = parseInt($('auto-max-steps').value) || 10;
+  if (!desc) { toast('Goal description required', 'err'); return; }
+  try {
+    await api('POST', '/api/autonomous/goals', {description: desc, max_steps: maxSteps});
+    toast('Goal created', 'ok');
+    $('auto-goal-desc').value = '';
+    loadAutonomous();
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+async function runGoalLoop() {
+  const agentId = $('auto-run-agent').value.trim();
+  const desc = $('auto-run-desc').value.trim();
+  const maxSteps = parseInt($('auto-run-steps').value) || 5;
+  if (!agentId || !desc) { toast('Agent ID and goal description required', 'err'); return; }
+  const el = $('autonomous-results');
+  el.innerHTML = '<div class="card"><div class="empty">Running goal loop...</div></div>';
+  try {
+    const res = await api('POST', '/api/autonomous/goals/run', {agent_id: agentId, description: desc, max_steps: maxSteps});
+    if (res.error) { el.innerHTML = `<div class="card"><div class="empty" style="color:var(--red)">${esc(res.error)}</div></div>`; return; }
+    el.innerHTML = `<div class="card">
+      <div class="card-title">${res.success ? '&#x2705;' : '&#x274C;'} Goal: ${esc(res.status)} <span class="badge">${res.steps_executed} steps</span></div>
+      ${res.result ? `<div style="margin-top:8px"><strong style="color:var(--green);font-size:11px">Result:</strong><pre style="background:var(--bg);padding:8px;border-radius:var(--r);font-size:11px;margin-top:4px;white-space:pre-wrap;color:var(--text2)">${esc(res.result)}</pre></div>` : ''}
+      <div style="margin-top:8px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+        <div style="text-align:center;padding:6px;background:var(--bg);border-radius:var(--r)"><div style="font-size:14px;font-weight:700;color:var(--yellow)">$${res.budget?.cost_spent?.toFixed(4)||0}</div><div style="font-size:9px;color:var(--muted)">Cost</div></div>
+        <div style="text-align:center;padding:6px;background:var(--bg);border-radius:var(--r)"><div style="font-size:14px;font-weight:700;color:var(--blue)">${res.budget?.tokens_spent||0}</div><div style="font-size:9px;color:var(--muted)">Tokens</div></div>
+        <div style="text-align:center;padding:6px;background:var(--bg);border-radius:var(--r)"><div style="font-size:14px;font-weight:700;color:var(--purple)">${res.budget?.duration_spent?.toFixed(1)||0}s</div><div style="font-size:9px;color:var(--muted)">Duration</div></div>
+        <div style="text-align:center;padding:6px;background:var(--bg);border-radius:var(--r)"><div style="font-size:14px;font-weight:700;color:var(--green)">${res.budget?.tool_calls_spent||0}</div><div style="font-size:9px;color:var(--muted)">Tool Calls</div></div>
+      </div>
+      ${res.steps?.length ? `<div style="margin-top:8px"><strong style="color:var(--text2);font-size:11px">Execution Log:</strong>
+        <table class="data-table" style="margin-top:4px"><thead><tr><th>Step</th><th>Status</th><th>Response</th></tr></thead><tbody>
+        ${res.steps.map(s => `<tr>
+          <td>${s.step}</td>
+          <td>${s.success ? '<span class="status-badge ok">OK</span>' : '<span class="status-badge err">FAIL</span>'}</td>
+          <td style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.content.slice(0,100))}</td>
+        </tr>`).join('')}
+        </tbody></table></div>` : ''}
+    </div>`;
+    loadAutonomous();
+  } catch(e) { el.innerHTML = `<div class="card"><div class="empty" style="color:var(--red)">${esc(e.message)}</div></div>`; }
+}
+
+async function resolveApproval() {
+  const id = $('a-id').value.trim(), decision = $('a-decision').value;
+  if (!id) return toast('Request ID required','err');
+  try { await api('POST','/api/ops/approvals/resolve', {request_id:id, decision}); closeModals(); toast('Approval resolved','ok'); }
+  catch(e) { toast(e.message,'err'); }
+}
+
+// ══════════════════════════════════════════
+//  Modals
+// ══════════════════════════════════════════
+function openModal(id) { $(`modal-${id}`).classList.add('show'); }
+function closeModals() { document.querySelectorAll('.modal-bg').forEach(m => m.classList.remove('show')); }
+
+async function createAgent() {
+  const id = $('m-id').value.trim(), prompt = $('m-prompt').value.trim();
+  if (!id) return toast('Agent ID required','err');
+  try {
+    await api('POST','/api/agents/create', {agent_id:id, system_prompt:prompt||'You are a helpful assistant.'});
+    closeModals(); await loadAgents(); pick(id);
+    toast('Agent created','ok');
+  } catch(e) { toast(e.message,'err'); }
+}
+
+// ══════════════════════════════════════════
+//  Utils
+// ══════════════════════════════════════════
+function $(id) { return document.getElementById(id); }
+function esc(s) { if(!s)return''; const d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
+function stripAnsi(s) { return s ? String(s).replace(/\x1b\[[0-9;]*m/g, '') : ''; }
+
+function toast(msg, type) {
+  const t = document.createElement('div');
+  t.className = 'toast ' + (type||'ok');
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+// Auto-resize textarea
+$('msg-input').addEventListener('input', function() { this.style.height='auto'; this.style.height=Math.min(this.scrollHeight,160)+'px'; });
+$('msg-input').addEventListener('keydown', function(e) { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();} });
+
+// ══════════════════════════════════════════
+//  Init
+// ══════════════════════════════════════════
+(async()=>{
+  await checkHealth();
+  await loadAgents();
+  setInterval(checkHealth, 15000);
+})();
+</script>
+</body>
+</html>

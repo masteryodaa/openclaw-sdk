@@ -78,7 +78,7 @@ async def test_logout_passes_channel_name(connected_mock_gateway: MockGateway) -
 
 
 # ---------------------------------------------------------------------------
-# web_login_start
+# web_login_start — verified: no params (gateway auto-selects channel)
 # ---------------------------------------------------------------------------
 
 
@@ -87,44 +87,45 @@ async def test_web_login_start(connected_mock_gateway: MockGateway) -> None:
         "web.login.start", {"qrDataUrl": "data:image/png;base64,..."}
     )
     manager = ChannelManager(connected_mock_gateway)
-    result = await manager.web_login_start("whatsapp")
+    result = await manager.web_login_start()
 
     assert "qrDataUrl" in result
     assert result["qrDataUrl"].startswith("data:image/png;base64,")
-    connected_mock_gateway.assert_called_with("web.login.start", {"channel": "whatsapp"})
+    connected_mock_gateway.assert_called_with("web.login.start", {})
 
 
-async def test_web_login_start_passes_channel(connected_mock_gateway: MockGateway) -> None:
+async def test_web_login_start_returns_qr(connected_mock_gateway: MockGateway) -> None:
     connected_mock_gateway.register("web.login.start", {"qrDataUrl": "data:image/png;base64,abc"})
     manager = ChannelManager(connected_mock_gateway)
-    await manager.web_login_start("telegram")
-    connected_mock_gateway.assert_called_with("web.login.start", {"channel": "telegram"})
+    result = await manager.web_login_start()
+    assert result["qrDataUrl"] == "data:image/png;base64,abc"
+    connected_mock_gateway.assert_called_with("web.login.start", {})
 
 
 # ---------------------------------------------------------------------------
-# web_login_wait
+# web_login_wait — verified: {timeoutMs?} only, no channel param
 # ---------------------------------------------------------------------------
 
 
 async def test_web_login_wait_default_timeout(connected_mock_gateway: MockGateway) -> None:
     connected_mock_gateway.register(
-        "web.login.wait", {"status": "linked", "channel": "whatsapp"}
+        "web.login.wait", {"connected": True, "message": "linked"}
     )
     manager = ChannelManager(connected_mock_gateway)
-    result = await manager.web_login_wait("whatsapp")
+    result = await manager.web_login_wait()
 
-    assert result["status"] == "linked"
+    assert result["connected"] is True
     connected_mock_gateway.assert_called_with(
-        "web.login.wait", {"channel": "whatsapp", "timeoutMs": 120000}
+        "web.login.wait", {"timeoutMs": 120000}
     )
 
 
 async def test_web_login_wait_custom_timeout(connected_mock_gateway: MockGateway) -> None:
-    connected_mock_gateway.register("web.login.wait", {"status": "timeout"})
+    connected_mock_gateway.register("web.login.wait", {"connected": False, "message": "timeout"})
     manager = ChannelManager(connected_mock_gateway)
-    await manager.web_login_wait("whatsapp", timeout_ms=30000)
+    await manager.web_login_wait(timeout_ms=30000)
     connected_mock_gateway.assert_called_with(
-        "web.login.wait", {"channel": "whatsapp", "timeoutMs": 30000}
+        "web.login.wait", {"timeoutMs": 30000}
     )
 
 

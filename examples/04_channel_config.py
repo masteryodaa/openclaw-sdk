@@ -57,14 +57,14 @@ async def main() -> None:
 
     # 3. Start QR login via the shorthand login() method
     print("\nStarting WhatsApp QR login...")
-    login_start = await client.channels.login("whatsapp")
+    login_start = await client.channels.login()
     qr_url = login_start.get("qrDataUrl", "")
     print(f"  QR data URL length: {len(qr_url)} chars")
     print(f"  (In a real app you would render this QR code for the user to scan)")
 
     # 4. Wait for QR scan
     print("\nWaiting for QR scan...")
-    login_result = await client.channels.web_login_wait("whatsapp", timeout_ms=10000)
+    login_result = await client.channels.web_login_wait(timeout_ms=10000)
     print(f"  Linked: {login_result.get('linked')}")
     print(f"  Phone : {login_result.get('phone', 'N/A')}")
 

@@ -88,7 +88,7 @@ result = await agent.execute(
 
 ## Attachments
 
-You can attach images to a query using the `Attachment` class. Attachments are base64-encoded and sent inline with the request.
+You can attach files to a query using the `Attachment` class. The gateway accepts any MIME type — images, PDFs, text files, etc. Attachments are base64-encoded and sent inline with the request.
 
 ```python
 import asyncio
@@ -109,8 +109,8 @@ async def main():
 asyncio.run(main())
 ```
 
-!!! warning
-    Attachments are limited to **5 MB** per file and support **image formats only** (PNG, JPEG, GIF, WebP). Attempting to attach other file types or oversized files will raise a validation error.
+!!! note "Size Limit"
+    The SDK does not impose its own size limit. The practical constraint is the gateway's WebSocket `maxPayload` of **512 KiB** (~380 KB of raw data after base64 overhead). Files exceeding this will fail at the transport layer.
 
 ## ExecutionResult Fields
 

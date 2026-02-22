@@ -68,7 +68,11 @@ class MockGateway(Gateway):
         return HealthStatus(healthy=self._connected, version="mock")
 
     async def call(
-        self, method: str, params: dict[str, Any] | None = None
+        self,
+        method: str,
+        params: dict[str, Any] | None = None,
+        *,
+        timeout: float | None = None,
     ) -> dict[str, Any]:
         if not self._connected:
             raise RuntimeError("MockGateway not connected. Call await mock.connect() first.")
