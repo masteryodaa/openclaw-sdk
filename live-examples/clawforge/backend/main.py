@@ -13,8 +13,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.helpers import database, gateway
+from app.routers.billing import router as billing_router
+from app.routers.build import router as build_router
+from app.routers.chat import router as chat_router
+from app.routers.export import router as export_router
+from app.routers.files import router as files_router
 from app.routers.health import router as health_router
 from app.routers.projects import router as projects_router
+from app.routers.templates import router as templates_router
 
 
 @asynccontextmanager
@@ -40,6 +46,12 @@ app.add_middleware(
 
 app.include_router(health_router)
 app.include_router(projects_router)
+app.include_router(chat_router)
+app.include_router(build_router)
+app.include_router(files_router)
+app.include_router(templates_router)
+app.include_router(billing_router)
+app.include_router(export_router)
 
 if __name__ == "__main__":
     import uvicorn
