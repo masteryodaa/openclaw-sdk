@@ -89,7 +89,8 @@ mcp = FastMCP(
 
 def _get_client(ctx: Context[ServerSession, AppContext]) -> OpenClawClient:
     """Extract the OpenClaw client from the MCP context."""
-    return ctx.request_context.lifespan_context.client
+    result: OpenClawClient = ctx.request_context.lifespan_context.client  # type: ignore[no-any-return]
+    return result
 
 
 def _format_result(result: ExecutionResult) -> str:
