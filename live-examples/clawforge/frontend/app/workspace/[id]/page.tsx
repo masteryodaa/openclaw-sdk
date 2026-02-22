@@ -21,6 +21,8 @@ export default function WorkspacePage() {
   const [buildMode, setBuildMode] = useState<"pipeline" | "supervisor">("pipeline");
   const [building, setBuilding] = useState(false);
 
+  const [autoSent, setAutoSent] = useState(false);
+
   useEffect(() => {
     getProject(projectId).then((p) => {
       setProject(p);
@@ -123,6 +125,14 @@ export default function WorkspacePage() {
       setStreaming(false);
     }
   }, [projectId]);
+
+  // Auto-send the project description as the first message for new projects
+  useEffect(() => {
+    if (project && !autoSent && messages.length === 0 && project.description) {
+      setAutoSent(true);
+      handleSendMessage(project.description);
+    }
+  }, [project, autoSent, messages.length, handleSendMessage]);
 
   const handleBuild = useCallback(async () => {
     setBuilding(true);
