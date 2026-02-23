@@ -63,7 +63,10 @@ npm run dev
 4. Chat with your AI agent in the left panel
 5. Click "Build" to run the multi-agent pipeline
 6. View generated files in the right panel
-7. Check the Billing page for cost breakdown
+7. If the agent creates a React/Vite app, a **"Build & Preview"** button appears automatically — click it to run `npm install + build` and get a live iframe preview
+8. Check the Billing page for cost breakdown
+
+> **Framework App Detection**: ClawForge polls the agent's session file list after each response. When a `package.json` is detected in the workspace, it either auto-triggers the npm build (if quiet) or shows the "Build & Preview" button.
 
 ## API Endpoints
 
@@ -77,8 +80,13 @@ npm run dev
 | DELETE | `/api/projects/{id}` | Delete project |
 | POST | `/api/chat` | Send message (blocking) |
 | POST | `/api/chat/stream` | Send message (SSE) |
-| POST | `/api/build/stream` | Build project (SSE) |
-| GET | `/api/files/{project_id}` | List files |
+| GET | `/api/chat/session-status/{id}` | Poll agent session files & active tools |
+| POST | `/api/build/stream` | Build project (SSE pipeline) |
+| POST | `/api/build/workspace-npm` | Run `npm install + build` in workspace dir |
+| GET | `/api/files/{project_id}` | List generated files (DB) |
+| GET | `/api/files/workspace/{path}` | Read workspace file (local filesystem) |
+| POST | `/api/files/workspace-record/{id}` | Persist workspace file to DB |
+| GET | `/workspace-site/{project_id}/{path}` | Serve built app files (iframe preview) |
 | GET | `/api/templates` | List templates |
 | POST | `/api/templates/create` | Create from template |
 | GET | `/api/billing/summary` | Billing summary |
@@ -107,3 +115,21 @@ clawforge/
     components/             # React components
     lib/                    # API client, types, SSE
 ```
+
+## Known Limitations
+
+### `files.get` Gateway RPC — Not Implemented
+The OpenClaw gateway (≤ 2026.2.3-1) does **not** implement the `files.get` RPC method.
+`Agent.get_file()` in the SDK raises `GatewayError: unknown method: files.get` when called.
+
+ClawForge works around this by reading workspace files directly from the local filesystem:
+```
+~/.openclaw/workspace/<path>
+```
+This works for co-located deployments (ClawForge backend + OpenClaw on the same machine).
+Remote gateway file access is an unimplemented gateway feature.
+
+### Framework App Previews (React/Vite)
+Real-time `file_generated` events are only emitted by `MockGateway` (tests) — **not** by the
+live OpenClaw gateway. ClawForge detects framework apps by polling the agent session's file list
+for a `package.json` after each response, then triggering an npm build automatically.
