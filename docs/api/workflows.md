@@ -65,12 +65,7 @@ engine with retries and HMAC signing.
 
 ## Webhooks
 
-### WebhookManager
-
-::: openclaw_sdk.webhooks.manager.WebhookManager
-    options:
-      show_source: true
-      heading_level: 4
+See [Managers — WebhookManager](managers.md#webhookmanager) for the full API reference.
 
 ### WebhookConfig
 

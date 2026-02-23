@@ -1,8 +1,8 @@
 site_name: OpenClaw SDK
 site_description: The official Python SDK for the OpenClaw autonomous AI agent framework
-site_url: https://openclaw-sdk.github.io/openclaw-sdk/
-repo_url: https://github.com/openclaw-sdk/openclaw-sdk
-repo_name: openclaw-sdk/openclaw-sdk
+site_url: https://masteryodaa.github.io/openclaw-sdk/
+repo_url: https://github.com/masteryodaa/openclaw-sdk
+repo_name: masteryodaa/openclaw-sdk
 edit_uri: edit/main/docs/
 
 theme:

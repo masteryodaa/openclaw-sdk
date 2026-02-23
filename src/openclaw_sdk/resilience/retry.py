@@ -96,8 +96,8 @@ class RetryPolicy(BaseModel):
             The return value of *fn*.
 
         Raises:
-            The last exception raised by *fn* if all retries are exhausted,
-            or immediately if the exception is not retryable.
+            Exception: The last exception raised by *fn* if all retries are
+                exhausted, or immediately if the exception is not retryable.
         """
         last_exc: Exception | None = None
 
