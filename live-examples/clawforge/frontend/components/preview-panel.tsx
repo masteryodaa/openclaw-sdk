@@ -87,11 +87,31 @@ function findPreviewableHtml(
 /** Sandboxed iframe preview for inlined HTML content (static files). */
 function HtmlPreview({ html }: { html: string }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  // True when the next load event is our intentional srcdoc set; false = user navigation
+  const expectedLoadRef = useRef(true);
 
   useEffect(() => {
-    if (iframeRef.current) {
-      iframeRef.current.srcdoc = html;
-    }
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+
+    // Mark next load as intentional, then write srcdoc
+    expectedLoadRef.current = true;
+    iframe.srcdoc = html;
+
+    const onLoad = () => {
+      if (expectedLoadRef.current) {
+        // Our srcdoc loaded — subsequent loads would be user-triggered navigation
+        expectedLoadRef.current = false;
+        return;
+      }
+      // Iframe navigated away (e.g. sidebar link called window.location.href).
+      // Restore immediately so the preview never shows an unrelated page.
+      expectedLoadRef.current = true;
+      iframe.srcdoc = html;
+    };
+
+    iframe.addEventListener("load", onLoad);
+    return () => iframe.removeEventListener("load", onLoad);
   }, [html]);
 
   return (

@@ -84,7 +84,7 @@ async function inlineWorkspaceAssets(html: string, htmlPath: string): Promise<st
     "    e.preventDefault();",
     "  }, true);",
     "})();",
-    "<\\/script>",
+    "</script>",
   ].join("\n");
 
   if (result.includes("</head>")) {
