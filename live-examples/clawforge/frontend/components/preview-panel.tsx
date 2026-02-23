@@ -119,7 +119,11 @@ function HtmlPreview({ html }: { html: string }) {
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-zinc-700/50 bg-zinc-900/50">
         <span className="text-[10px] text-zinc-500 uppercase tracking-wider">Live Preview</span>
         <button
-          onClick={() => { const w = window.open("", "_blank"); if (w) { w.document.write(html); w.document.close(); } }}
+          onClick={() => {
+            const blob = new Blob([html], { type: "text/html" });
+            const url = URL.createObjectURL(blob);
+            window.open(url, "_blank");
+          }}
           className="text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors"
         >Open in tab &#8599;</button>
       </div>
