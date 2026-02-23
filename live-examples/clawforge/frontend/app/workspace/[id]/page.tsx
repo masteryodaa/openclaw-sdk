@@ -102,24 +102,28 @@ export default function WorkspacePage() {
   // Ref to trigger an immediate session status check from inside SSE handler
   const immediateCheckRef = useRef<(() => Promise<void>) | null>(null);
 
-  /** Persist a workspace file to DB, inline its CSS/JS, then update preview. */
+  /** Persist a workspace file to DB, inline its CSS/JS, then update preview.
+   *  Always reflects the current disk state — handles agent re-writing a file. */
   const persistAndPreview = useCallback(async (path: string) => {
     try {
       const saved = await saveWorkspaceRecord(projectId, path);
-      // Update files list (avoid duplicates)
+      // Replace stale entry or add new entry (file may have been re-written)
       setFiles((prev) => {
-        if (prev.find((f) => f.path === saved.path)) return prev;
-        return [...prev, saved];
+        const without = prev.filter((f) => f.path !== saved.path);
+        return [...without, saved];
       });
-      // Only preview HTML files
+      // Only preview HTML files — always read fresh content from disk via the
+      // workspace endpoint so CSS/JS siblings are up-to-date too
       if (saved.mime_type === "text/html" || saved.name.endsWith(".html") || saved.name.endsWith(".htm")) {
-        const rawHtml = saved.content || await readWorkspaceFile(path);
-        // Inline CSS/JS so the srcdoc iframe renders correctly (no base URL)
+        // Read directly from disk (workspace endpoint) to get the absolute latest;
+        // saved.content is already fresh from the upsert but re-fetching siblings
+        // (CSS/JS) via inlineWorkspaceAssets ensures they're also current.
+        const rawHtml = saved.content;
         const inlined = await inlineWorkspaceAssets(rawHtml, path);
         setWorkspaceHtml(inlined);
       }
     } catch {
-      // Fallback: read + inline directly
+      // Fallback: read + inline directly from disk
       try {
         const rawHtml = await readWorkspaceFile(path);
         const inlined = await inlineWorkspaceAssets(rawHtml, path);

@@ -23,9 +23,10 @@ OPENCLAW_WORKSPACE = Path.home() / ".openclaw" / "workspace"
 
 @router.post("/workspace-record/{project_id}")
 async def save_workspace_record(project_id: str, path: str = Query(...)):
-    """Read a workspace file and persist it as a generated_file DB record.
+    """Read a workspace file and persist it as a generated_file DB record (upsert).
 
-    Idempotent — returns existing record if already saved for this project+path.
+    Always reflects the current disk state — if the agent has re-written the file
+    since the last call, the DB record is updated and fresh content is returned.
     """
     log.info("POST /api/files/workspace-record/%s path=%s", project_id[:8], path)
     safe = Path(path)
@@ -44,16 +45,21 @@ async def save_workspace_record(project_id: str, path: str = Query(...)):
     except UnicodeDecodeError:
         raise HTTPException(415, "Binary file — cannot serve as text")
 
-    # Idempotent: return existing record if already saved
-    existing = await database.get_files(project_id)
-    for f in existing:
-        if f["path"] == path:
-            log.debug("Workspace record already exists for %s", path)
-            return f
-
     ext = full.suffix.lower()
     mime = "text/html" if ext in (".html", ".htm") else "text/plain"
     name = full.name
+
+    # Upsert: update existing record if present (agent may have re-written the file),
+    # otherwise insert a new record. Always returns fresh disk content.
+    existing = await database.get_files(project_id)
+    for f in existing:
+        if f["path"] == path:
+            if f["content"] == content:
+                log.debug("Workspace record unchanged for %s", path)
+                return f
+            updated = await database.update_file(project_id, path, content, len(content))
+            log.info("Updated workspace record %s (%d bytes)", path, len(content))
+            return updated
 
     saved = await database.add_file(project_id, name, path, content, len(content), mime)
     log.info("Saved workspace record %s (%d bytes)", path, len(content))

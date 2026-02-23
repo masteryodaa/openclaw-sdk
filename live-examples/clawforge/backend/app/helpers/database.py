@@ -324,6 +324,26 @@ async def add_file(
     }
 
 
+async def update_file(project_id: str, path: str, content: str, size_bytes: int) -> dict | None:
+    """Update an existing generated file's content and size. Returns updated record or None."""
+    log.info("Updating file project=%s path=%r (%d bytes)", project_id[:8], path, size_bytes)
+    db = await _get_db()
+    try:
+        await db.execute(
+            "UPDATE generated_files SET content = ?, size_bytes = ? WHERE project_id = ? AND path = ?",
+            (content, size_bytes, project_id, path),
+        )
+        await db.commit()
+        cursor = await db.execute(
+            "SELECT * FROM generated_files WHERE project_id = ? AND path = ?",
+            (project_id, path),
+        )
+        row = await cursor.fetchone()
+        return _row_to_dict(row) if row else None
+    finally:
+        await db.close()
+
+
 async def get_files(project_id: str) -> list[dict]:
     """Get all generated files for a project."""
     log.debug("Fetching files for project %s", project_id[:8])
