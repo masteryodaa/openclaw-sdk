@@ -26,8 +26,11 @@ import type { SessionTool } from "@/lib/api";
  *
  * Example: <link href="style.css"> → <style>...css content...</style>
  *          <script src="app.js"> → <script>...js content...</script>
+ *
+ * When projectId is provided asset fetches go through the SDK gateway RPC first
+ * (remote-gateway compatible). Falls back to local filesystem reads otherwise.
  */
-async function inlineWorkspaceAssets(html: string, htmlPath: string): Promise<string> {
+async function inlineWorkspaceAssets(html: string, htmlPath: string, projectId?: string): Promise<string> {
   // Derive base directory from the HTML file's path (e.g. "erp-website/")
   const baseDir = htmlPath.includes("/")
     ? htmlPath.slice(0, htmlPath.lastIndexOf("/") + 1)
@@ -48,7 +51,7 @@ async function inlineWorkspaceAssets(html: string, htmlPath: string): Promise<st
   }
   for (const { tag, path } of cssReplacements) {
     try {
-      const css = await readWorkspaceFile(path);
+      const css = await readWorkspaceFile(path, projectId);
       result = result.replace(tag, `<style>${css}</style>`);
     } catch { /* skip missing files */ }
   }
@@ -64,7 +67,7 @@ async function inlineWorkspaceAssets(html: string, htmlPath: string): Promise<st
   }
   for (const { tag, path } of jsReplacements) {
     try {
-      const js = await readWorkspaceFile(path);
+      const js = await readWorkspaceFile(path, projectId);
       result = result.replace(tag, `<script>${js}</script>`);
     } catch { /* skip missing files */ }
   }
@@ -165,14 +168,14 @@ export default function WorkspacePage() {
         // saved.content is already fresh from the upsert but re-fetching siblings
         // (CSS/JS) via inlineWorkspaceAssets ensures they're also current.
         const rawHtml = saved.content;
-        const inlined = await inlineWorkspaceAssets(rawHtml, path);
+        const inlined = await inlineWorkspaceAssets(rawHtml, path, projectId);
         setWorkspaceHtml(inlined);
       }
     } catch {
-      // Fallback: read + inline directly from disk
+      // Fallback: read + inline directly (passes projectId for SDK-first fetch)
       try {
-        const rawHtml = await readWorkspaceFile(path);
-        const inlined = await inlineWorkspaceAssets(rawHtml, path);
+        const rawHtml = await readWorkspaceFile(path, projectId);
+        const inlined = await inlineWorkspaceAssets(rawHtml, path, projectId);
         setWorkspaceHtml(inlined);
       } catch { /* ignore */ }
     }
@@ -480,7 +483,7 @@ export default function WorkspacePage() {
         try {
           const result = await buildWorkspaceApp(frameworkDir);
           // Preview via /workspace-site/ URL — works for remote gateways
-          setPreviewUrl(workspaceSiteUrl(result.index_path));
+          setPreviewUrl(workspaceSiteUrl(projectId, result.index_path));
         } catch (err) {
           console.error("Framework app build failed:", err);
           // Fallback: try to show static HTML if agent also wrote one

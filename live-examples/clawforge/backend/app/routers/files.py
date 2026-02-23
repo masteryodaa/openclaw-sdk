@@ -1,22 +1,60 @@
-"""File endpoints — generated project files + OpenClaw workspace files."""
+"""File endpoints — generated project files + OpenClaw workspace files.
+
+File content retrieval strategy:
+1. Try ``files.get`` gateway RPC via the SDK (works for both local and remote gateways).
+2. Fall back to reading from local filesystem (for local-only setups where the gateway
+   and backend are co-located on the same machine).
+
+This dual-path approach lets ClawForge work as a remote gateway showcase while staying
+backward-compatible with the common local-gateway setup.
+"""
 
 from __future__ import annotations
 
+import base64
 import logging
-import os
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import PlainTextResponse
 
-from app.helpers import database
+from app.helpers import database, gateway
 
 log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/files", tags=["files"])
 
-# OpenClaw stores agent workspace files here
+# OpenClaw stores agent workspace files here (local fallback path)
 OPENCLAW_WORKSPACE = Path.home() / ".openclaw" / "workspace"
+
+
+async def _read_via_sdk(project_id: str, path: str) -> str:
+    """Read a workspace file via the SDK's ``files.get`` gateway RPC.
+
+    Returns the file content as a UTF-8 string.
+    Raises on any gateway or decode error so callers can fall back to local I/O.
+    """
+    client = await gateway.get_client()
+    # Session key follows the same convention as the chat controller
+    session_key = f"agent:main:clawforge-{project_id}"
+    result = await client.gateway.call(
+        "files.get", {"sessionKey": session_key, "path": path}
+    )
+    raw = result.get("content", "")
+    if result.get("encoding") == "base64":
+        return base64.b64decode(raw).decode("utf-8", errors="replace")
+    return raw if isinstance(raw, str) else raw.decode("utf-8", errors="replace")
+
+
+def _read_local(path: str) -> str:
+    """Read a workspace file from the local filesystem (co-located gateway fallback)."""
+    safe = Path(path)
+    full = OPENCLAW_WORKSPACE / safe
+    if not full.exists() or not full.is_file():
+        raise FileNotFoundError(f"Not found: {full}")
+    if full.stat().st_size > 5_000_000:
+        raise ValueError("File too large (>5MB)")
+    return full.read_text(encoding="utf-8")
 
 
 # --- Workspace routes MUST come before /{project_id} catch-all ---
@@ -25,32 +63,43 @@ OPENCLAW_WORKSPACE = Path.home() / ".openclaw" / "workspace"
 async def save_workspace_record(project_id: str, path: str = Query(...)):
     """Read a workspace file and persist it as a generated_file DB record (upsert).
 
-    Always reflects the current disk state — if the agent has re-written the file
-    since the last call, the DB record is updated and fresh content is returned.
+    Tries the SDK gateway RPC (``files.get``) first so this works with remote gateways.
+    Falls back to reading from the local filesystem when the SDK call is unavailable.
+    Always reflects the current agent-written state — re-calling updates the DB record.
     """
     log.info("POST /api/files/workspace-record/%s path=%s", project_id[:8], path)
-    safe = Path(path)
-    if ".." in safe.parts:
+    if ".." in Path(path).parts:
         raise HTTPException(400, "Invalid path")
 
-    full = OPENCLAW_WORKSPACE / safe
-    if not full.exists() or not full.is_file():
-        raise HTTPException(404, "File not found in workspace")
-
-    if full.stat().st_size > 5_000_000:
-        raise HTTPException(413, "File too large")
-
+    # 1. Try SDK (remote-gateway compatible)
+    content: str | None = None
     try:
-        content = full.read_text(encoding="utf-8")
-    except UnicodeDecodeError:
-        raise HTTPException(415, "Binary file — cannot serve as text")
+        content = await _read_via_sdk(project_id, path)
+        log.info("workspace-record: read %s via SDK (%d bytes)", path, len(content))
+    except Exception as sdk_exc:
+        log.warning(
+            "workspace-record: files.get SDK unavailable (%s), trying local filesystem",
+            sdk_exc,
+        )
 
-    ext = full.suffix.lower()
+    # 2. Fall back to local filesystem
+    if content is None:
+        try:
+            content = _read_local(path)
+            log.info("workspace-record: read %s from local filesystem (%d bytes)", path, len(content))
+        except FileNotFoundError:
+            raise HTTPException(404, "File not found in workspace")
+        except ValueError as exc:
+            raise HTTPException(413, str(exc))
+        except UnicodeDecodeError:
+            raise HTTPException(415, "Binary file — cannot serve as text")
+
+    ext = Path(path).suffix.lower()
     mime = "text/html" if ext in (".html", ".htm") else "text/plain"
-    name = full.name
+    name = Path(path).name
 
     # Upsert: update existing record if present (agent may have re-written the file),
-    # otherwise insert a new record. Always returns fresh disk content.
+    # otherwise insert a new record.
     existing = await database.get_files(project_id)
     for f in existing:
         if f["path"] == path:
@@ -67,35 +116,45 @@ async def save_workspace_record(project_id: str, path: str = Query(...)):
 
 
 @router.get("/workspace/{path:path}")
-async def read_workspace_file(path: str):
-    """Read a file from OpenClaw's agent workspace directory."""
-    log.info("GET /api/files/workspace/%s", path)
-    # Sanitize path to prevent traversal
-    safe = Path(path)
-    if ".." in safe.parts:
+async def read_workspace_file(path: str, project_id: str = Query(default="")):
+    """Read a file from OpenClaw's agent workspace directory.
+
+    When ``project_id`` is provided the SDK gateway RPC (``files.get``) is tried first,
+    enabling remote-gateway support. Falls back to local filesystem in both cases.
+    """
+    log.info("GET /api/files/workspace/%s project_id=%s", path, project_id or "(none)")
+    if ".." in Path(path).parts:
         raise HTTPException(400, "Invalid path")
 
-    full = OPENCLAW_WORKSPACE / safe
-    if not full.exists() or not full.is_file():
-        log.warning("Workspace file not found: %s", full)
-        raise HTTPException(404, "File not found in workspace")
+    content: str | None = None
 
-    # Only serve text-like files
-    size = full.stat().st_size
-    if size > 5_000_000:  # 5MB cap
-        raise HTTPException(413, "File too large")
+    # 1. Try SDK when project_id is known (remote-gateway compatible)
+    if project_id:
+        try:
+            content = await _read_via_sdk(project_id, path)
+            log.info("workspace/: read %s via SDK (%d bytes)", path, len(content))
+        except Exception as sdk_exc:
+            log.warning(
+                "workspace/: files.get SDK unavailable (%s), trying local filesystem",
+                sdk_exc,
+            )
 
-    try:
-        content = full.read_text(encoding="utf-8")
-        log.info("Served workspace file %s (%d bytes)", path, len(content))
+    # 2. Fall back to local filesystem
+    if content is None:
+        try:
+            content = _read_local(path)
+            log.info("workspace/: read %s from local filesystem (%d bytes)", path, len(content))
+        except FileNotFoundError:
+            raise HTTPException(404, "File not found in workspace")
+        except ValueError as exc:
+            raise HTTPException(413, str(exc))
+        except UnicodeDecodeError:
+            raise HTTPException(415, "Binary file — cannot serve as text")
 
-        # Determine content type
-        ext = full.suffix.lower()
-        if ext in (".html", ".htm"):
-            return PlainTextResponse(content, media_type="text/html")
-        return PlainTextResponse(content)
-    except UnicodeDecodeError:
-        raise HTTPException(415, "Binary file — cannot serve as text")
+    ext = Path(path).suffix.lower()
+    if ext in (".html", ".htm"):
+        return PlainTextResponse(content, media_type="text/html")
+    return PlainTextResponse(content)
 
 
 # --- Project file routes ---

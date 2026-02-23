@@ -604,11 +604,27 @@ class Agent:
 
         Gateway method: ``files.get``
 
+        .. warning::
+            **Not available on OpenClaw gateway 2026.2.3-1 and earlier.**
+            The ``files.get`` RPC method is not implemented by the current OpenClaw
+            gateway and raises ``GatewayError: unknown method: files.get``.
+
+            As a workaround for co-located deployments (SDK and gateway on the same
+            machine), read the file directly from the agent's workspace directory:
+            ``~/.openclaw/workspace/<path>``
+
+            Remote file access is a planned gateway feature. Track progress at
+            https://github.com/openclaw/openclaw/issues.
+
         Args:
             file_path: The path returned in a :class:`~openclaw_sdk.core.types.GeneratedFile`.
 
         Returns:
             Raw file bytes.
+
+        Raises:
+            GatewayError: Always raises on OpenClaw ≤ 2026.2.3-1 because
+                ``files.get`` is not a recognised gateway method.
         """
         result = await self._client.gateway.call(
             "files.get",

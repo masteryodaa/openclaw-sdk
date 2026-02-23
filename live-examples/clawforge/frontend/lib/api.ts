@@ -61,8 +61,11 @@ export const getProjectFiles = (projectId: string) =>
   fetchAPI<GeneratedFile[]>(`/api/files/${projectId}`);
 
 // Workspace files (from OpenClaw's agent workspace)
-export const readWorkspaceFile = async (path: string): Promise<string> => {
-  const res = await fetch(`${API_URL}/api/files/workspace/${path}`);
+// When projectId is provided the backend tries the SDK gateway RPC first (remote-gateway
+// compatible); otherwise falls back to local filesystem reads.
+export const readWorkspaceFile = async (path: string, projectId?: string): Promise<string> => {
+  const qs = projectId ? `?project_id=${encodeURIComponent(projectId)}` : "";
+  const res = await fetch(`${API_URL}/api/files/workspace/${path}${qs}`);
   if (!res.ok) throw new Error(`Failed to read workspace file: ${res.status}`);
   return res.text();
 };
@@ -97,5 +100,8 @@ export const buildWorkspaceApp = (directory: string) =>
   });
 
 /** Returns the full URL to a workspace file served via the backend.
- *  Use this for iframe src= so it works for remote gateways too. */
-export const workspaceSiteUrl = (path: string) => `${API_URL}/workspace-site/${path}`;
+ *  Use this for iframe src= so it works for remote gateways too.
+ *  The route is /workspace-site/{projectId}/{path} so the backend can
+ *  derive the session key and try the SDK gateway RPC first. */
+export const workspaceSiteUrl = (projectId: string, path: string) =>
+  `${API_URL}/workspace-site/${projectId}/${path}`;
