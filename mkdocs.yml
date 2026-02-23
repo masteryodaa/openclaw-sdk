@@ -156,12 +156,13 @@ nav:
     - Resilience: api/resilience.md
     - Dashboard: api/dashboard.md
   - Examples: examples/index.md
+  - Roadmap: roadmap.md
   - Changelog: changelog.md
 
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/openclaw-sdk/openclaw-sdk
+      link: https://github.com/masteryodaa/openclaw-sdk
   generator: false
 
 copyright: Copyright &copy; 2026 OpenClaw Contributors
