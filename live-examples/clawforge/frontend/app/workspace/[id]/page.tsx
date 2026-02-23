@@ -112,6 +112,8 @@ export default function WorkspacePage() {
   /** Workspace directory of a detected framework app (e.g. "erp-dashboard"). */
   const frameworkDirRef = useRef<string | null>(null);
 
+  /** True while polling for sub-agent file writes after the main stream ends. */
+  const [postStreamChecking, setPostStreamChecking] = useState(false);
   const [autoSent, setAutoSent] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(0);
@@ -248,6 +250,64 @@ export default function WorkspacePage() {
   useEffect(() => {
     return () => stopSessionPolling();
   }, [stopSessionPolling]);
+
+  /**
+   * Poll session-status after the main stream ends to catch files written by sub-agents.
+   * Runs every 3 seconds for up to 5 minutes, stopping after 30s with no new session files.
+   */
+  const startPostStreamPolling = useCallback(() => {
+    setPostStreamChecking(true);
+    const startTime = Date.now();
+    let lastSessionFileCount = -1;
+    let quietSince = Date.now();
+
+    const tick = async () => {
+      // Hard limit: 5 minutes
+      if (Date.now() - startTime > 5 * 60 * 1000) {
+        setPostStreamChecking(false);
+        refreshProject();
+        return;
+      }
+
+      try {
+        const status = await getSessionStatus(projectId);
+
+        // Track activity: new files appearing = sub-agent still writing
+        if (lastSessionFileCount === -1) {
+          lastSessionFileCount = status.files.length;
+          quietSince = Date.now();
+        } else if (status.files.length !== lastSessionFileCount) {
+          lastSessionFileCount = status.files.length;
+          quietSince = Date.now(); // reset quiet timer
+        }
+
+        // Persist + preview all HTML files found so far
+        const htmlPaths = new Set<string>();
+        for (const f of status.files) {
+          if (f.path.endsWith(".html") || f.path.endsWith(".htm")) htmlPaths.add(f.path);
+        }
+        for (const f of filesRef.current) {
+          if (f.mime_type === "text/html" || f.name.endsWith(".html") || f.name.endsWith(".htm")) {
+            htmlPaths.add(f.path);
+          }
+        }
+        for (const path of Array.from(htmlPaths)) {
+          await persistAndPreview(path);
+        }
+
+        // Stop if quiet for 30 seconds — sub-agent has finished
+        if (Date.now() - quietSince > 30_000) {
+          setPostStreamChecking(false);
+          refreshProject();
+          return;
+        }
+      } catch { /* polling failure is not fatal */ }
+
+      setTimeout(tick, 3000);
+    };
+
+    setTimeout(tick, 2000); // First check 2s after stream ends
+  }, [projectId, persistAndPreview, refreshProject]);
 
   const handleSendMessage = useCallback(async (text: string) => {
     const userMsg: ChatMessage = {
@@ -403,27 +463,16 @@ export default function WorkspacePage() {
           frameworkDirRef.current = null;
         }
       } else {
-        // Static HTML: final sweep — persist ALL known HTML files
-        try {
-          const finalStatus = await getSessionStatus(projectId);
-          const htmlPaths = new Set<string>();
-          for (const f of finalStatus.files) {
-            if (f.path.endsWith(".html") || f.path.endsWith(".htm")) htmlPaths.add(f.path);
-          }
-          for (const f of filesRef.current) {
-            if (f.mime_type === "text/html" || f.name.endsWith(".html") || f.name.endsWith(".htm")) {
-              htmlPaths.add(f.path);
-            }
-          }
-          for (const path of Array.from(htmlPaths)) {
-            await persistAndPreview(path);
-          }
-        } catch { /* ignore */ }
+        // Start post-stream polling to catch sub-agent file writes.
+        // Continues for up to 5 min, stops after 30s with no new files.
+        // refreshProject() is called inside startPostStreamPolling when it stops.
+        startPostStreamPolling();
+        return; // don't call refreshProject here; startPostStreamPolling handles it
       }
 
       refreshProject();
     }
-  }, [projectId, refreshProject, startSessionPolling, stopSessionPolling, persistAndPreview, setFilesAndRef]);
+  }, [projectId, refreshProject, startSessionPolling, stopSessionPolling, persistAndPreview, setFilesAndRef, startPostStreamPolling]);
 
   useEffect(() => {
     if (project && !autoSent && messages.length === 0 && project.description) {
@@ -535,6 +584,7 @@ export default function WorkspacePage() {
               onSend={handleSendMessage}
               streaming={streaming}
               streamStatus={streamStatus}
+              postStreamChecking={postStreamChecking}
             />
           </div>
           <div className="w-[55%]">

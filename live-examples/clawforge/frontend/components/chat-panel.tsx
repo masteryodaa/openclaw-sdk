@@ -13,9 +13,11 @@ interface ChatPanelProps {
   onSend: (text: string) => void;
   streaming: boolean;
   streamStatus?: StreamingStatus;
+  /** True while polling for sub-agent file writes after the main stream ends. */
+  postStreamChecking?: boolean;
 }
 
-export function ChatPanel({ messages, onSend, streaming, streamStatus }: ChatPanelProps) {
+export function ChatPanel({ messages, onSend, streaming, streamStatus, postStreamChecking }: ChatPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = useCallback(() => {
@@ -47,6 +49,13 @@ export function ChatPanel({ messages, onSend, streaming, streamStatus }: ChatPan
             {/* Real-time streaming indicator */}
             {streamStatus?.active && (
               <StreamingIndicator status={streamStatus} />
+            )}
+            {/* Post-stream indicator: sub-agent still writing files */}
+            {!streaming && postStreamChecking && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-800/60 border border-zinc-700/40 text-xs text-zinc-400">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                Agent working in background — checking for files…
+              </div>
             )}
           </div>
         </ScrollArea>
