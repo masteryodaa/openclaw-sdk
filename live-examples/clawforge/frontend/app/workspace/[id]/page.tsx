@@ -18,6 +18,58 @@ import { Button } from "@/components/ui/button";
 import type { Project, ChatMessage, GeneratedFile } from "@/lib/types";
 import type { SessionTool } from "@/lib/api";
 
+/**
+ * Inline all relative CSS and JS assets referenced in the HTML so it renders
+ * correctly inside a sandboxed srcdoc iframe (which has no base URL).
+ *
+ * Example: <link href="style.css"> → <style>...css content...</style>
+ *          <script src="app.js"> → <script>...js content...</script>
+ */
+async function inlineWorkspaceAssets(html: string, htmlPath: string): Promise<string> {
+  // Derive base directory from the HTML file's path (e.g. "erp-website/")
+  const baseDir = htmlPath.includes("/")
+    ? htmlPath.slice(0, htmlPath.lastIndexOf("/") + 1)
+    : "";
+
+  let result = html;
+
+  // Inline CSS: <link rel="stylesheet" href="relative/path.css">
+  const linkRe = /<link([^>]*?)href=["']([^"']+)["']([^>]*?)\/?>/gi;
+  const cssReplacements: Array<{ tag: string; path: string }> = [];
+  let m: RegExpExecArray | null;
+  while ((m = linkRe.exec(html)) !== null) {
+    const attrs = m[1] + m[3];
+    const href = m[2];
+    if (/rel=["']stylesheet["']/i.test(attrs) && !/^https?:|^\/\//i.test(href)) {
+      cssReplacements.push({ tag: m[0], path: baseDir + href });
+    }
+  }
+  for (const { tag, path } of cssReplacements) {
+    try {
+      const css = await readWorkspaceFile(path);
+      result = result.replace(tag, `<style>${css}</style>`);
+    } catch { /* skip missing files */ }
+  }
+
+  // Inline JS: <script src="relative/path.js"></script>
+  const scriptRe = /<script([^>]*?)src=["']([^"']+)["']([^>]*?)><\/script>/gi;
+  const jsReplacements: Array<{ tag: string; path: string }> = [];
+  while ((m = scriptRe.exec(html)) !== null) {
+    const src = m[2];
+    if (!/^https?:|^\/\//i.test(src)) {
+      jsReplacements.push({ tag: m[0], path: baseDir + src });
+    }
+  }
+  for (const { tag, path } of jsReplacements) {
+    try {
+      const js = await readWorkspaceFile(path);
+      result = result.replace(tag, `<script>${js}</script>`);
+    } catch { /* skip missing files */ }
+  }
+
+  return result;
+}
+
 /** Describes what the agent is currently doing — with real tool names. */
 export interface StreamingStatus {
   active: boolean;
@@ -50,7 +102,7 @@ export default function WorkspacePage() {
   // Ref to trigger an immediate session status check from inside SSE handler
   const immediateCheckRef = useRef<(() => Promise<void>) | null>(null);
 
-  /** Persist a workspace file to DB and update frontend state. */
+  /** Persist a workspace file to DB, inline its CSS/JS, then update preview. */
   const persistAndPreview = useCallback(async (path: string) => {
     try {
       const saved = await saveWorkspaceRecord(projectId, path);
@@ -59,19 +111,19 @@ export default function WorkspacePage() {
         if (prev.find((f) => f.path === saved.path)) return prev;
         return [...prev, saved];
       });
-      // Update preview with file content (content is included in saved record)
-      if (saved.content && (saved.mime_type === "text/html" || saved.name.endsWith(".html"))) {
-        setWorkspaceHtml(saved.content);
-      } else {
-        // Fallback: read directly
-        const html = await readWorkspaceFile(path);
-        setWorkspaceHtml(html);
+      // Only preview HTML files
+      if (saved.mime_type === "text/html" || saved.name.endsWith(".html") || saved.name.endsWith(".htm")) {
+        const rawHtml = saved.content || await readWorkspaceFile(path);
+        // Inline CSS/JS so the srcdoc iframe renders correctly (no base URL)
+        const inlined = await inlineWorkspaceAssets(rawHtml, path);
+        setWorkspaceHtml(inlined);
       }
     } catch {
-      // Silently fall back to direct read
+      // Fallback: read + inline directly
       try {
-        const html = await readWorkspaceFile(path);
-        setWorkspaceHtml(html);
+        const rawHtml = await readWorkspaceFile(path);
+        const inlined = await inlineWorkspaceAssets(rawHtml, path);
+        setWorkspaceHtml(inlined);
       } catch { /* ignore */ }
     }
   }, [projectId]);
@@ -116,7 +168,10 @@ export default function WorkspacePage() {
         (f) => f.mime_type === "text/html" || f.name.endsWith(".html") || f.name.endsWith(".htm"),
       );
       if (htmlFile?.content) {
-        setWorkspaceHtml(htmlFile.content);
+        // Inline CSS/JS so the srcdoc iframe renders correctly
+        inlineWorkspaceAssets(htmlFile.content, htmlFile.path)
+          .then(setWorkspaceHtml)
+          .catch(() => setWorkspaceHtml(htmlFile.content)); // fallback: raw html
       } else {
         // Fall back to session poll (works if OpenClaw session is still alive)
         getSessionStatus(projectId).then((status) => {
