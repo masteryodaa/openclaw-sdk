@@ -2,7 +2,13 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
-import { getProject, listProjects, getSessionStatus, readWorkspaceFile } from "@/lib/api";
+import {
+  getProject,
+  listProjects,
+  getSessionStatus,
+  readWorkspaceFile,
+  saveWorkspaceRecord,
+} from "@/lib/api";
 import { streamSSE } from "@/lib/sse";
 import { ChatPanel } from "@/components/chat-panel";
 import { PreviewPanel } from "@/components/preview-panel";
@@ -41,24 +47,90 @@ export default function WorkspacePage() {
   const [autoSent, setAutoSent] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(0);
+  // Ref to trigger an immediate session status check from inside SSE handler
+  const immediateCheckRef = useRef<(() => Promise<void>) | null>(null);
 
+  /** Persist a workspace file to DB and update frontend state. */
+  const persistAndPreview = useCallback(async (path: string) => {
+    try {
+      const saved = await saveWorkspaceRecord(projectId, path);
+      // Update files list (avoid duplicates)
+      setFiles((prev) => {
+        if (prev.find((f) => f.path === saved.path)) return prev;
+        return [...prev, saved];
+      });
+      // Update preview with file content (content is included in saved record)
+      if (saved.content && (saved.mime_type === "text/html" || saved.name.endsWith(".html"))) {
+        setWorkspaceHtml(saved.content);
+      } else {
+        // Fallback: read directly
+        const html = await readWorkspaceFile(path);
+        setWorkspaceHtml(html);
+      }
+    } catch {
+      // Silently fall back to direct read
+      try {
+        const html = await readWorkspaceFile(path);
+        setWorkspaceHtml(html);
+      } catch { /* ignore */ }
+    }
+  }, [projectId]);
+
+  /** Check session status immediately and update tool/file state. */
+  const checkSessionNow = useCallback(async () => {
+    try {
+      const status = await getSessionStatus(projectId);
+      const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+      if (status.tools.length > 0) {
+        const lastTool = status.tools[status.tools.length - 1];
+        setStreamStatus((prev) => ({
+          ...prev,
+          phase: lastTool.phase === "call" ? "tool_call" : prev.phase,
+          toolName: lastTool.phase === "call" ? lastTool.tool : prev.toolName,
+          toolHistory: status.tools,
+          elapsed,
+        }));
+      } else {
+        setStreamStatus((prev) => ({ ...prev, elapsed }));
+      }
+      // Persist + preview any new HTML files
+      for (const f of status.files) {
+        if (f.path.endsWith(".html") || f.path.endsWith(".htm")) {
+          await persistAndPreview(f.path);
+          break;
+        }
+      }
+    } catch { /* polling failure is not fatal */ }
+  }, [projectId, persistAndPreview]);
+
+  // Mount: load project + restore preview from DB (no OpenClaw session dependency)
   useEffect(() => {
     getProject(projectId).then((p) => {
       setProject(p);
       setMessages(p.messages || []);
-      setFiles(p.files || []);
+      const projectFiles: GeneratedFile[] = p.files || [];
+      setFiles(projectFiles);
+
+      // Restore workspace HTML from DB-persisted files (survives refresh + OpenClaw restart)
+      const htmlFile = projectFiles.find(
+        (f) => f.mime_type === "text/html" || f.name.endsWith(".html") || f.name.endsWith(".htm"),
+      );
+      if (htmlFile?.content) {
+        setWorkspaceHtml(htmlFile.content);
+      } else {
+        // Fall back to session poll (works if OpenClaw session is still alive)
+        getSessionStatus(projectId).then((status) => {
+          for (const f of status.files) {
+            if (f.path.endsWith(".html") || f.path.endsWith(".htm")) {
+              persistAndPreview(f.path);
+              break;
+            }
+          }
+        }).catch(() => {});
+      }
     });
     listProjects().then(setProjects).catch(() => {});
-    // Initial poll: check for workspace files from previous runs
-    getSessionStatus(projectId).then((status) => {
-      for (const f of status.files) {
-        if (f.path.endsWith(".html") || f.path.endsWith(".htm")) {
-          readWorkspaceFile(f.path).then(setWorkspaceHtml).catch(() => {});
-          break; // Use the first HTML file found
-        }
-      }
-    }).catch(() => {});
-  }, [projectId]);
+  }, [projectId, persistAndPreview]);
 
   const refreshProject = useCallback(async () => {
     try {
@@ -71,46 +143,21 @@ export default function WorkspacePage() {
     }
   }, [projectId]);
 
-  // Poll session for real tool names during streaming
+  // Poll session for real tool names every 2.5s during streaming
   const startSessionPolling = useCallback(() => {
     if (pollRef.current) return;
     startTimeRef.current = Date.now();
-    pollRef.current = setInterval(async () => {
-      try {
-        const status = await getSessionStatus(projectId);
-        const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
-        if (status.tools.length > 0) {
-          const lastTool = status.tools[status.tools.length - 1];
-          setStreamStatus((prev) => ({
-            ...prev,
-            phase: lastTool.phase === "call" ? "tool_call" : prev.phase,
-            toolName: lastTool.phase === "call" ? lastTool.tool : prev.toolName,
-            toolHistory: status.tools,
-            elapsed,
-          }));
-        } else {
-          setStreamStatus((prev) => ({ ...prev, elapsed }));
-        }
-        // If file was written, fetch its content for preview
-        if (status.files.length > 0) {
-          for (const f of status.files) {
-            if (f.path.endsWith(".html") || f.path.endsWith(".htm")) {
-              try {
-                const html = await readWorkspaceFile(f.path);
-                setWorkspaceHtml(html);
-              } catch { /* ignore */ }
-            }
-          }
-        }
-      } catch { /* polling failure is not fatal */ }
-    }, 2500);
-  }, [projectId]);
+    // Expose immediate check so SSE handler can call it
+    immediateCheckRef.current = checkSessionNow;
+    pollRef.current = setInterval(checkSessionNow, 2500);
+  }, [checkSessionNow]);
 
   const stopSessionPolling = useCallback(() => {
     if (pollRef.current) {
       clearInterval(pollRef.current);
       pollRef.current = null;
     }
+    immediateCheckRef.current = null;
   }, []);
 
   useEffect(() => {
@@ -218,6 +265,8 @@ export default function WorkspacePage() {
               }
               return updated;
             });
+            // Immediately check for files written by this tool (no waiting for next 2.5s poll)
+            immediateCheckRef.current?.();
           } else if (event === "file_generated") {
             setFiles((prev) => [...prev, {
               id: `file-${Date.now()}`,
@@ -239,22 +288,20 @@ export default function WorkspacePage() {
       setStreaming(false);
       setStreamStatus({ active: false, phase: "", toolHistory: [], elapsed: 0 });
 
-      // Final poll: catch any files written during execution
+      // Final poll: persist any files that were written
       try {
         const finalStatus = await getSessionStatus(projectId);
         for (const f of finalStatus.files) {
           if (f.path.endsWith(".html") || f.path.endsWith(".htm")) {
-            try {
-              const html = await readWorkspaceFile(f.path);
-              setWorkspaceHtml(html);
-            } catch { /* ignore */ }
+            await persistAndPreview(f.path);
+            break;
           }
         }
       } catch { /* ignore */ }
 
       refreshProject();
     }
-  }, [projectId, refreshProject, startSessionPolling, stopSessionPolling]);
+  }, [projectId, refreshProject, startSessionPolling, stopSessionPolling, persistAndPreview]);
 
   useEffect(() => {
     if (project && !autoSent && messages.length === 0 && project.description) {

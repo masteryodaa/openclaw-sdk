@@ -67,6 +67,13 @@ export const readWorkspaceFile = async (path: string): Promise<string> => {
   return res.text();
 };
 
+/** Persist a workspace file to the project's generated_files DB record. Idempotent. */
+export const saveWorkspaceRecord = (projectId: string, path: string) =>
+  fetchAPI<GeneratedFile>(
+    `/api/files/workspace-record/${projectId}?path=${encodeURIComponent(path)}`,
+    { method: "POST" },
+  );
+
 // Session status (real-time tool activity polling)
 export interface SessionTool { tool: string; phase: string; output?: string }
 export interface SessionFile { path: string; size: number }
