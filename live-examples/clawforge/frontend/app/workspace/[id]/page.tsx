@@ -8,6 +8,8 @@ import {
   getSessionStatus,
   readWorkspaceFile,
   saveWorkspaceRecord,
+  buildWorkspaceApp,
+  workspaceSiteUrl,
 } from "@/lib/api";
 import { streamSSE } from "@/lib/sse";
 import { ChatPanel } from "@/components/chat-panel";
@@ -103,6 +105,12 @@ export default function WorkspacePage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [projects, setProjects] = useState<Project[]>([]);
   const [workspaceHtml, setWorkspaceHtml] = useState<string | null>(null);
+  /** URL for framework app preview (React/Vite built app served via /workspace-site/). */
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  /** Whether a framework npm build is currently running. */
+  const [appBuilding, setAppBuilding] = useState(false);
+  /** Workspace directory of a detected framework app (e.g. "erp-dashboard"). */
+  const frameworkDirRef = useRef<string | null>(null);
 
   const [autoSent, setAutoSent] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -359,8 +367,14 @@ export default function WorkspacePage() {
                 created_at: new Date().toISOString(),
               }];
             });
-            // Immediately persist + preview if it's an HTML file
-            if (filePath.endsWith(".html") || filePath.endsWith(".htm")) {
+            // Detect framework apps by watching for package.json
+            if ((d.name as string) === "package.json" && filePath.includes("/")) {
+              const dir = filePath.slice(0, filePath.lastIndexOf("/"));
+              frameworkDirRef.current = dir;
+            }
+            // Immediately persist + preview if it's a static HTML file
+            // (skip if we've detected a framework app — those need a build step)
+            if ((filePath.endsWith(".html") || filePath.endsWith(".htm")) && !frameworkDirRef.current) {
               persistAndPreview(filePath);
             }
           }
@@ -373,23 +387,39 @@ export default function WorkspacePage() {
       setStreaming(false);
       setStreamStatus({ active: false, phase: "", toolHistory: [], elapsed: 0 });
 
-      // Final sweep: persist ALL known HTML files + any new ones from session status.
-      // Using filesRef.current (not stale closure) so we catch files added during streaming.
-      try {
-        const finalStatus = await getSessionStatus(projectId);
-        const htmlPaths = new Set<string>();
-        for (const f of finalStatus.files) {
-          if (f.path.endsWith(".html") || f.path.endsWith(".htm")) htmlPaths.add(f.path);
+      // If agent created a framework app (React/Vite), trigger npm build
+      const frameworkDir = frameworkDirRef.current;
+      if (frameworkDir) {
+        setAppBuilding(true);
+        try {
+          const result = await buildWorkspaceApp(frameworkDir);
+          // Preview via /workspace-site/ URL — works for remote gateways
+          setPreviewUrl(workspaceSiteUrl(result.index_path));
+        } catch (err) {
+          console.error("Framework app build failed:", err);
+          // Fallback: try to show static HTML if agent also wrote one
+        } finally {
+          setAppBuilding(false);
+          frameworkDirRef.current = null;
         }
-        for (const f of filesRef.current) {
-          if (f.mime_type === "text/html" || f.name.endsWith(".html") || f.name.endsWith(".htm")) {
-            htmlPaths.add(f.path);
+      } else {
+        // Static HTML: final sweep — persist ALL known HTML files
+        try {
+          const finalStatus = await getSessionStatus(projectId);
+          const htmlPaths = new Set<string>();
+          for (const f of finalStatus.files) {
+            if (f.path.endsWith(".html") || f.path.endsWith(".htm")) htmlPaths.add(f.path);
           }
-        }
-        for (const path of Array.from(htmlPaths)) {
-          await persistAndPreview(path);
-        }
-      } catch { /* ignore */ }
+          for (const f of filesRef.current) {
+            if (f.mime_type === "text/html" || f.name.endsWith(".html") || f.name.endsWith(".htm")) {
+              htmlPaths.add(f.path);
+            }
+          }
+          for (const path of Array.from(htmlPaths)) {
+            await persistAndPreview(path);
+          }
+        } catch { /* ignore */ }
+      }
 
       refreshProject();
     }
@@ -508,7 +538,13 @@ export default function WorkspacePage() {
             />
           </div>
           <div className="w-[55%]">
-            <PreviewPanel files={files} messages={messages} workspaceHtml={workspaceHtml} />
+            <PreviewPanel
+              files={files}
+              messages={messages}
+              workspaceHtml={workspaceHtml}
+              previewUrl={previewUrl}
+              building={appBuilding}
+            />
           </div>
         </div>
       </div>

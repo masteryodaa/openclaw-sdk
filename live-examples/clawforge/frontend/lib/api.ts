@@ -81,3 +81,21 @@ export interface SessionStatus { tools: SessionTool[]; files: SessionFile[]; err
 
 export const getSessionStatus = (projectId: string, agentId = "main") =>
   fetchAPI<SessionStatus>(`/api/chat/session-status/${projectId}?agent_id=${agentId}`);
+
+// Framework app build (npm install + npm run build / vite build --base=./)
+export interface NpmBuildResult {
+  success: boolean;
+  index_path: string;   // e.g. "erp-dashboard/dist/index.html"
+  preview_url: string;  // e.g. "/workspace-site/erp-dashboard/dist/index.html"
+  output: string;
+}
+
+export const buildWorkspaceApp = (directory: string) =>
+  fetchAPI<NpmBuildResult>("/api/build/workspace-npm", {
+    method: "POST",
+    body: JSON.stringify({ directory }),
+  });
+
+/** Returns the full URL to a workspace file served via the backend.
+ *  Use this for iframe src= so it works for remote gateways too. */
+export const workspaceSiteUrl = (path: string) => `${API_URL}/workspace-site/${path}`;

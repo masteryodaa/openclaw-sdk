@@ -12,6 +12,10 @@ interface PreviewPanelProps {
   files: GeneratedFile[];
   messages: ChatMessage[];
   workspaceHtml?: string | null;
+  /** Full URL to serve via iframe src= (for framework apps / remote gateways). */
+  previewUrl?: string | null;
+  /** Whether a framework app build is currently running. */
+  building?: boolean;
 }
 
 interface BuildEvent {
@@ -80,13 +84,12 @@ function findPreviewableHtml(
   return null;
 }
 
-/** Sandboxed iframe preview for HTML content. */
+/** Sandboxed iframe preview for inlined HTML content (static files). */
 function HtmlPreview({ html }: { html: string }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     if (iframeRef.current) {
-      // Use srcdoc for sandboxed inline HTML rendering
       iframeRef.current.srcdoc = html;
     }
   }, [html]);
@@ -96,33 +99,54 @@ function HtmlPreview({ html }: { html: string }) {
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-zinc-700/50 bg-zinc-900/50">
         <span className="text-[10px] text-zinc-500 uppercase tracking-wider">Live Preview</span>
         <button
-          onClick={() => {
-            // Open in new tab
-            const win = window.open("", "_blank");
-            if (win) {
-              win.document.write(html);
-              win.document.close();
-            }
-          }}
+          onClick={() => { const w = window.open("", "_blank"); if (w) { w.document.write(html); w.document.close(); } }}
           className="text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors"
-          title="Open in new tab"
-        >
-          Open in tab &#8599;
-        </button>
+        >Open in tab &#8599;</button>
       </div>
       <div className="flex-1 bg-white rounded-b">
-        <iframe
-          ref={iframeRef}
-          sandbox="allow-scripts"
-          className="w-full h-full border-0 rounded-b"
-          title="Preview"
-        />
+        <iframe ref={iframeRef} sandbox="allow-scripts" className="w-full h-full border-0 rounded-b" title="Preview" />
       </div>
     </div>
   );
 }
 
-export function PreviewPanel({ files, messages, workspaceHtml }: PreviewPanelProps) {
+/** Full iframe via src URL — for framework apps (React/Vite) served by ClawForge backend.
+ *  Works for remote gateways: browser only needs to reach the ClawForge backend,
+ *  not the agent's local dev server. */
+function UrlPreview({ url }: { url: string }) {
+  const [key, setKey] = useState(0);
+  return (
+    <div className="h-full flex flex-col">
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-zinc-700/50 bg-zinc-900/50">
+        <span className="text-[10px] text-zinc-500 uppercase tracking-wider">
+          Live Preview <span className="text-emerald-500/70 ml-1">&#9679; Built app</span>
+        </span>
+        <div className="flex items-center gap-3">
+          <button onClick={() => setKey(k => k + 1)} className="text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors" title="Reload">&#8635; Reload</button>
+          <a href={url} target="_blank" rel="noreferrer" className="text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors">Open in tab &#8599;</a>
+        </div>
+      </div>
+      <div className="flex-1 bg-white rounded-b">
+        <iframe key={key} src={url} className="w-full h-full border-0 rounded-b" title="Preview" />
+      </div>
+    </div>
+  );
+}
+
+/** Shown while the npm build is running. */
+function BuildingPreview() {
+  return (
+    <div className="h-full flex items-center justify-center">
+      <div className="text-center">
+        <div className="text-2xl mb-3 animate-spin inline-block">&#9881;</div>
+        <p className="text-zinc-400 text-sm">Building app…</p>
+        <p className="text-zinc-600 text-xs mt-1">Running npm install + build</p>
+      </div>
+    </div>
+  );
+}
+
+export function PreviewPanel({ files, messages, workspaceHtml, previewUrl, building }: PreviewPanelProps) {
   const [selectedFile, setSelectedFile] = useState<GeneratedFile | null>(null);
   const [selectedCode, setSelectedCode] = useState<ExtractedCode | null>(null);
   const [activeTab, setActiveTab] = useState("preview");
@@ -145,14 +169,18 @@ export function PreviewPanel({ files, messages, workspaceHtml }: PreviewPanelPro
     [codeBlocks, files, workspaceHtml],
   );
 
-  // Auto-switch to preview tab when HTML appears
+  // Auto-switch to preview tab when any preview content appears
   const prevHtmlRef = useRef<string | null>(null);
+  const prevUrlRef = useRef<string | null>(null);
   useEffect(() => {
-    if (previewHtml && previewHtml !== prevHtmlRef.current) {
+    if (previewUrl && previewUrl !== prevUrlRef.current) {
+      prevUrlRef.current = previewUrl;
+      setActiveTab("preview");
+    } else if (previewHtml && previewHtml !== prevHtmlRef.current) {
       prevHtmlRef.current = previewHtml;
       setActiveTab("preview");
     }
-  }, [previewHtml]);
+  }, [previewHtml, previewUrl]);
 
   const hasFiles = files.length > 0;
 
@@ -172,7 +200,13 @@ export function PreviewPanel({ files, messages, workspaceHtml }: PreviewPanelPro
       </TabsList>
 
       <TabsContent value="preview" className="flex-1 overflow-hidden mx-4 mb-2 rounded-lg border border-zinc-700/50">
-        {previewHtml ? (
+        {building ? (
+          <BuildingPreview />
+        ) : previewUrl ? (
+          // Framework app (React/Vite) — served via backend, works for remote gateways
+          <UrlPreview url={previewUrl} />
+        ) : previewHtml ? (
+          // Static HTML (inline CSS/JS) — sandboxed srcdoc
           <HtmlPreview html={previewHtml} />
         ) : (
           <div className="flex h-full items-center justify-center">

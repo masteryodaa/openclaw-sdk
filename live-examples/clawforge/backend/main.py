@@ -22,6 +22,7 @@ from app.routers.files import router as files_router
 from app.routers.health import router as health_router
 from app.routers.projects import router as projects_router
 from app.routers.templates import router as templates_router
+from app.routers.workspace_site import router as workspace_site_router
 
 # ---------------------------------------------------------------------------
 # Logging setup — all backend modules use logging.getLogger(__name__)
@@ -72,6 +73,8 @@ app.include_router(files_router)
 app.include_router(templates_router)
 app.include_router(billing_router)
 app.include_router(export_router)
+# Workspace static file server — MUST be last (catch-all path pattern)
+app.include_router(workspace_site_router)
 
 if __name__ == "__main__":
     import uvicorn
