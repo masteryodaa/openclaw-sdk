@@ -281,8 +281,59 @@ export default function WorkspacePage() {
   }, [stopSessionPolling]);
 
   /**
+   * Trigger npm install + build for a framework app directory then show the preview.
+   * Called automatically when package.json is detected, or manually via the Build button.
+   */
+  const triggerAppBuild = useCallback(async (appDir: string) => {
+    setAppBuilding(true);
+    try {
+      const result = await buildWorkspaceApp(appDir);
+      setPreviewUrl(workspaceSiteUrl(projectId, result.index_path));
+    } catch (err) {
+      console.error("Framework app build failed:", err);
+    } finally {
+      setAppBuilding(false);
+      frameworkDirRef.current = null;
+    }
+  }, [projectId]);
+
+  /**
+   * Manual "Build & Preview" — detects the app directory from known files or session status
+   * and triggers the npm build. Used when auto-detection didn't fire (e.g. the real gateway
+   * doesn't emit file_generated events, so package.json detection falls back to polling).
+   */
+  const handleBuildApp = useCallback(async () => {
+    let appDir: string | null = frameworkDirRef.current;
+
+    // Check already-persisted files for package.json
+    if (!appDir) {
+      for (const f of filesRef.current) {
+        if (f.name === "package.json" && f.path.includes("/")) {
+          appDir = f.path.slice(0, f.path.lastIndexOf("/"));
+          break;
+        }
+      }
+    }
+    // Fall back to live session status
+    if (!appDir) {
+      try {
+        const status = await getSessionStatus(projectId);
+        for (const f of status.files) {
+          if (f.path.endsWith("package.json") && f.path.includes("/")) {
+            appDir = f.path.slice(0, f.path.lastIndexOf("/"));
+            break;
+          }
+        }
+      } catch {}
+    }
+    if (!appDir) return;
+    await triggerAppBuild(appDir);
+  }, [projectId, triggerAppBuild]);
+
+  /**
    * Poll session-status after the main stream ends to catch files written by sub-agents.
    * Runs every 3 seconds for up to 5 minutes, stopping after 30s with no new session files.
+   * Also detects framework apps (package.json) and auto-triggers npm build when quiet.
    */
   const startPostStreamPolling = useCallback(() => {
     setPostStreamChecking(true);
@@ -290,11 +341,20 @@ export default function WorkspacePage() {
     let lastSessionFileCount = -1;
     let quietSince = Date.now();
 
+    const finishPolling = async () => {
+      setPostStreamChecking(false);
+      // If a framework app was detected during polling, build it now
+      const frameworkDir = frameworkDirRef.current;
+      if (frameworkDir) {
+        await triggerAppBuild(frameworkDir);
+      }
+      refreshProject();
+    };
+
     const tick = async () => {
       // Hard limit: 5 minutes
       if (Date.now() - startTime > 5 * 60 * 1000) {
-        setPostStreamChecking(false);
-        refreshProject();
+        await finishPolling();
         return;
       }
 
@@ -310,24 +370,36 @@ export default function WorkspacePage() {
           quietSince = Date.now(); // reset quiet timer
         }
 
-        // Persist + preview all HTML files found so far
-        const htmlPaths = new Set<string>();
-        for (const f of status.files) {
-          if (f.path.endsWith(".html") || f.path.endsWith(".htm")) htmlPaths.add(f.path);
-        }
-        for (const f of filesRef.current) {
-          if (f.mime_type === "text/html" || f.name.endsWith(".html") || f.name.endsWith(".htm")) {
-            htmlPaths.add(f.path);
+        // Detect framework app by watching for package.json in session file list
+        // (file_generated events don't fire on the real gateway, so we detect here)
+        if (!frameworkDirRef.current) {
+          for (const f of status.files) {
+            if (f.path.endsWith("package.json") && f.path.includes("/")) {
+              frameworkDirRef.current = f.path.slice(0, f.path.lastIndexOf("/"));
+              break;
+            }
           }
         }
-        for (const path of Array.from(htmlPaths)) {
-          await persistAndPreview(path);
+
+        // Persist + preview HTML files (skip for framework apps — they need a build step)
+        if (!frameworkDirRef.current) {
+          const htmlPaths = new Set<string>();
+          for (const f of status.files) {
+            if (f.path.endsWith(".html") || f.path.endsWith(".htm")) htmlPaths.add(f.path);
+          }
+          for (const f of filesRef.current) {
+            if (f.mime_type === "text/html" || f.name.endsWith(".html") || f.name.endsWith(".htm")) {
+              htmlPaths.add(f.path);
+            }
+          }
+          for (const path of Array.from(htmlPaths)) {
+            await persistAndPreview(path);
+          }
         }
 
         // Stop if quiet for 30 seconds — sub-agent has finished
         if (Date.now() - quietSince > 30_000) {
-          setPostStreamChecking(false);
-          refreshProject();
+          await finishPolling();
           return;
         }
       } catch { /* polling failure is not fatal */ }
@@ -336,7 +408,7 @@ export default function WorkspacePage() {
     };
 
     setTimeout(tick, 2000); // First check 2s after stream ends
-  }, [projectId, persistAndPreview, refreshProject]);
+  }, [projectId, persistAndPreview, refreshProject, triggerAppBuild]);
 
   const handleSendMessage = useCallback(async (text: string) => {
     const userMsg: ChatMessage = {
@@ -623,6 +695,7 @@ export default function WorkspacePage() {
               workspaceHtml={workspaceHtml}
               previewUrl={previewUrl}
               building={appBuilding}
+              onBuildApp={handleBuildApp}
             />
           </div>
         </div>

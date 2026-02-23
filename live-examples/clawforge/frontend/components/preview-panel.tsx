@@ -16,6 +16,8 @@ interface PreviewPanelProps {
   previewUrl?: string | null;
   /** Whether a framework app build is currently running. */
   building?: boolean;
+  /** Manual trigger: run npm install + build for the detected framework app. */
+  onBuildApp?: () => void;
 }
 
 interface BuildEvent {
@@ -170,7 +172,7 @@ function BuildingPreview() {
   );
 }
 
-export function PreviewPanel({ files, messages, workspaceHtml, previewUrl, building }: PreviewPanelProps) {
+export function PreviewPanel({ files, messages, workspaceHtml, previewUrl, building, onBuildApp }: PreviewPanelProps) {
   const [selectedFile, setSelectedFile] = useState<GeneratedFile | null>(null);
   const [selectedCode, setSelectedCode] = useState<ExtractedCode | null>(null);
   const [activeTab, setActiveTab] = useState("preview");
@@ -239,9 +241,24 @@ export function PreviewPanel({ files, messages, workspaceHtml, previewUrl, build
               <p className="text-zinc-500 text-sm">
                 HTML previews will appear here automatically.
               </p>
-              <p className="text-zinc-600 text-xs mt-1">
-                Ask the agent to generate HTML, CSS, or a web page.
-              </p>
+              {/* Show build button when source files exist but no HTML preview yet */}
+              {files.some(f => /\.(tsx?|jsx?|vue|svelte|py)$/.test(f.name)) && onBuildApp ? (
+                <div className="mt-4">
+                  <p className="text-zinc-600 text-xs mb-3">
+                    Looks like a framework app was created.
+                  </p>
+                  <button
+                    onClick={onBuildApp}
+                    className="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition-colors"
+                  >
+                    &#9881; Build &amp; Preview
+                  </button>
+                </div>
+              ) : (
+                <p className="text-zinc-600 text-xs mt-1">
+                  Ask the agent to generate HTML, CSS, or a web page.
+                </p>
+              )}
             </div>
           </div>
         )}
