@@ -69,6 +69,32 @@ async function inlineWorkspaceAssets(html: string, htmlPath: string): Promise<st
     } catch { /* skip missing files */ }
   }
 
+  // Inject a navigation blocker so sidebar/menu links don't navigate the srcdoc
+  // iframe to an external URL (which would load the ClawForge app inside the preview).
+  // Fragment (#) and javascript: hrefs are left alone so SPA onclick handlers still work.
+  const navBlocker = [
+    "<script>",
+    "(function(){",
+    "  document.addEventListener('click', function(e) {",
+    "    var el = e.target;",
+    "    while (el && el.tagName !== 'A') el = el.parentElement;",
+    "    if (!el || !el.hasAttribute('href')) return;",
+    "    var href = el.getAttribute('href') || '';",
+    "    if (href === '' || href.startsWith('#') || href.startsWith('javascript:')) return;",
+    "    e.preventDefault();",
+    "  }, true);",
+    "})();",
+    "<\\/script>",
+  ].join("\n");
+
+  if (result.includes("</head>")) {
+    result = result.replace("</head>", navBlocker + "\n</head>");
+  } else if (result.includes("<head>")) {
+    result = result.replace("<head>", "<head>\n" + navBlocker);
+  } else {
+    result = navBlocker + "\n" + result;
+  }
+
   return result;
 }
 
