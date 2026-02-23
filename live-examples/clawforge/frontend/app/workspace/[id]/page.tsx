@@ -86,6 +86,14 @@ export default function WorkspacePage() {
   const [project, setProject] = useState<Project | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [files, setFiles] = useState<GeneratedFile[]>([]);
+  /** Wrapper: keep filesRef in sync so callbacks always see current list. */
+  const setFilesAndRef = useCallback((updater: GeneratedFile[] | ((prev: GeneratedFile[]) => GeneratedFile[])) => {
+    setFiles((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      filesRef.current = next;
+      return next;
+    });
+  }, []);
   const [streaming, setStreaming] = useState(false);
   const [streamStatus, setStreamStatus] = useState<StreamingStatus>({
     active: false, phase: "", toolHistory: [], elapsed: 0,
@@ -101,6 +109,8 @@ export default function WorkspacePage() {
   const startTimeRef = useRef<number>(0);
   // Ref to trigger an immediate session status check from inside SSE handler
   const immediateCheckRef = useRef<(() => Promise<void>) | null>(null);
+  // Mirror of files state for use inside callbacks without stale closure issues
+  const filesRef = useRef<GeneratedFile[]>([]);
 
   /** Persist a workspace file to DB, inline its CSS/JS, then update preview.
    *  Always reflects the current disk state — handles agent re-writing a file. */
@@ -108,7 +118,7 @@ export default function WorkspacePage() {
     try {
       const saved = await saveWorkspaceRecord(projectId, path);
       // Replace stale entry or add new entry (file may have been re-written)
-      setFiles((prev) => {
+      setFilesAndRef((prev) => {
         const without = prev.filter((f) => f.path !== saved.path);
         return [...without, saved];
       });
@@ -130,7 +140,7 @@ export default function WorkspacePage() {
         setWorkspaceHtml(inlined);
       } catch { /* ignore */ }
     }
-  }, [projectId]);
+  }, [projectId, setFilesAndRef]);
 
   /** Check session status immediately and update tool/file state. */
   const checkSessionNow = useCallback(async () => {
@@ -149,12 +159,20 @@ export default function WorkspacePage() {
       } else {
         setStreamStatus((prev) => ({ ...prev, elapsed }));
       }
-      // Persist + preview any new HTML files
+
+      // Collect ALL HTML paths to refresh: session-detected new files + already-known files
+      // This is the key fix: don't rely solely on session text-parsing to detect re-writes
+      const htmlPaths = new Set<string>();
       for (const f of status.files) {
-        if (f.path.endsWith(".html") || f.path.endsWith(".htm")) {
-          await persistAndPreview(f.path);
-          break;
+        if (f.path.endsWith(".html") || f.path.endsWith(".htm")) htmlPaths.add(f.path);
+      }
+      for (const f of filesRef.current) {
+        if (f.mime_type === "text/html" || f.name.endsWith(".html") || f.name.endsWith(".htm")) {
+          htmlPaths.add(f.path);
         }
+      }
+      for (const path of Array.from(htmlPaths)) {
+        await persistAndPreview(path);
       }
     } catch { /* polling failure is not fatal */ }
   }, [projectId, persistAndPreview]);
@@ -165,19 +183,19 @@ export default function WorkspacePage() {
       setProject(p);
       setMessages(p.messages || []);
       const projectFiles: GeneratedFile[] = p.files || [];
+      filesRef.current = projectFiles;
       setFiles(projectFiles);
 
-      // Restore workspace HTML from DB-persisted files (survives refresh + OpenClaw restart)
-      const htmlFile = projectFiles.find(
+      // Restore workspace HTML — always call persistAndPreview for known HTML files
+      // so the upsert path runs and picks up any disk changes from the last session.
+      const htmlFiles = projectFiles.filter(
         (f) => f.mime_type === "text/html" || f.name.endsWith(".html") || f.name.endsWith(".htm"),
       );
-      if (htmlFile?.content) {
-        // Inline CSS/JS so the srcdoc iframe renders correctly
-        inlineWorkspaceAssets(htmlFile.content, htmlFile.path)
-          .then(setWorkspaceHtml)
-          .catch(() => setWorkspaceHtml(htmlFile.content)); // fallback: raw html
+      if (htmlFiles.length > 0) {
+        // Re-sync all known HTML files with disk (upsert updates DB if agent re-wrote them)
+        Promise.all(htmlFiles.map((f) => persistAndPreview(f.path))).catch(() => {});
       } else {
-        // Fall back to session poll (works if OpenClaw session is still alive)
+        // No known HTML yet — fall back to session poll
         getSessionStatus(projectId).then((status) => {
           for (const f of status.files) {
             if (f.path.endsWith(".html") || f.path.endsWith(".htm")) {
@@ -196,11 +214,11 @@ export default function WorkspacePage() {
       const p = await getProject(projectId);
       setProject(p);
       setMessages(p.messages || []);
-      setFiles(p.files || []);
+      setFilesAndRef(p.files || []);
     } catch (err) {
       console.error("Refresh failed:", err);
     }
-  }, [projectId]);
+  }, [projectId, setFilesAndRef]);
 
   // Poll session for real tool names every 2.5s during streaming
   const startSessionPolling = useCallback(() => {
@@ -327,16 +345,24 @@ export default function WorkspacePage() {
             // Immediately check for files written by this tool (no waiting for next 2.5s poll)
             immediateCheckRef.current?.();
           } else if (event === "file_generated") {
-            setFiles((prev) => [...prev, {
-              id: `file-${Date.now()}`,
-              project_id: projectId,
-              name: d.name as string,
-              path: d.path as string,
-              content: "",
-              size_bytes: (d.size as number) || 0,
-              mime_type: (d.mimeType as string) || "text/plain",
-              created_at: new Date().toISOString(),
-            }]);
+            const filePath = d.path as string;
+            setFilesAndRef((prev) => {
+              if (prev.find((f) => f.path === filePath)) return prev;
+              return [...prev, {
+                id: `file-${Date.now()}`,
+                project_id: projectId,
+                name: d.name as string,
+                path: filePath,
+                content: "",
+                size_bytes: (d.size as number) || 0,
+                mime_type: (d.mimeType as string) || "text/plain",
+                created_at: new Date().toISOString(),
+              }];
+            });
+            // Immediately persist + preview if it's an HTML file
+            if (filePath.endsWith(".html") || filePath.endsWith(".htm")) {
+              persistAndPreview(filePath);
+            }
           }
         }
       );
@@ -347,20 +373,27 @@ export default function WorkspacePage() {
       setStreaming(false);
       setStreamStatus({ active: false, phase: "", toolHistory: [], elapsed: 0 });
 
-      // Final poll: persist any files that were written
+      // Final sweep: persist ALL known HTML files + any new ones from session status.
+      // Using filesRef.current (not stale closure) so we catch files added during streaming.
       try {
         const finalStatus = await getSessionStatus(projectId);
+        const htmlPaths = new Set<string>();
         for (const f of finalStatus.files) {
-          if (f.path.endsWith(".html") || f.path.endsWith(".htm")) {
-            await persistAndPreview(f.path);
-            break;
+          if (f.path.endsWith(".html") || f.path.endsWith(".htm")) htmlPaths.add(f.path);
+        }
+        for (const f of filesRef.current) {
+          if (f.mime_type === "text/html" || f.name.endsWith(".html") || f.name.endsWith(".htm")) {
+            htmlPaths.add(f.path);
           }
+        }
+        for (const path of Array.from(htmlPaths)) {
+          await persistAndPreview(path);
         }
       } catch { /* ignore */ }
 
       refreshProject();
     }
-  }, [projectId, refreshProject, startSessionPolling, stopSessionPolling, persistAndPreview]);
+  }, [projectId, refreshProject, startSessionPolling, stopSessionPolling, persistAndPreview, setFilesAndRef]);
 
   useEffect(() => {
     if (project && !autoSent && messages.length === 0 && project.description) {
