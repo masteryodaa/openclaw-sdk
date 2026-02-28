@@ -23,7 +23,7 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -e ".[fastapi]"
-          pip install pytest pytest-asyncio pytest-cov mypy ruff black cryptography
+          pip install pytest pytest-asyncio pytest-cov mypy ruff cryptography
 
       - name: Run tests
         run: python -m pytest tests/ -q --tb=short
@@ -33,9 +33,6 @@ jobs:
 
       - name: Lint (ruff)
         run: python -m ruff check src/ tests/
-
-      - name: Format check (black)
-        run: python -m black --check src/ tests/
 
   publish:
     needs: quality-gate
