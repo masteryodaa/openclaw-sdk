@@ -55,12 +55,17 @@ asyncio.run(main())
 | `name` | `str` | Human-readable name for the schedule |
 | `schedule` | `str` | Cron expression (5 or 6 fields) |
 | `session_target` | `str` | Session key to trigger (`agent:{id}:{name}`) |
-| `payload` | `dict` | Data passed to the agent session on each run |
+| `payload` | `str` | Message to send when the job fires |
 
 !!! note
     The `session_target` follows the standard session key format:
     `agent:{agent_id}:{session_name}`. The agent must exist before the
     schedule fires.
+
+!!! tip "Auto-wrapping"
+    The gateway expects `schedule` as an object (`{kind: "cron", expr: "..."}`)
+    and `payload` as an object (`{message: "..."}`). The SDK wraps string values
+    automatically — just pass plain strings and it handles the conversion.
 
 ## Cron Expression Format
 

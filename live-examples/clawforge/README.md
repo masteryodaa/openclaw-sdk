@@ -7,7 +7,7 @@ Users describe what they want to build, and AI agents plan, build, and review th
 ## Architecture
 
 ```
-Browser (Next.js :3000)  ->  FastAPI Backend (:8200)  ->  openclaw-sdk  ->  OpenClaw Gateway
+Browser (Next.js :3002)  ->  FastAPI Backend (:8200)  ->  openclaw-sdk  ->  OpenClaw Gateway
 ```
 
 - **Backend**: FastAPI with routers/controllers/helpers pattern
@@ -52,12 +52,12 @@ python main.py
 cd frontend
 npm install
 npm run dev
-# -> http://localhost:3000
+# -> http://localhost:3002
 ```
 
 ### Usage
 
-1. Open http://localhost:3000
+1. Open http://localhost:3002
 2. Type a project description (e.g., "Build a todo app with FastAPI")
 3. Click "Start Building" -- creates a project and opens the workspace
 4. Chat with your AI agent in the left panel
@@ -119,7 +119,7 @@ clawforge/
 ## Known Limitations
 
 ### `files.get` Gateway RPC — Not Implemented
-The OpenClaw gateway (≤ 2026.2.3-1) does **not** implement the `files.get` RPC method.
+The OpenClaw gateway (≤ 2026.2.28) does **not** implement the `files.get` RPC method.
 `Agent.get_file()` in the SDK raises `GatewayError: unknown method: files.get` when called.
 
 ClawForge works around this by reading workspace files directly from the local filesystem:

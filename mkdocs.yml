@@ -112,6 +112,11 @@ nav:
     - Skills & ClawHub: guides/skills.md
     - Channels: guides/channels.md
     - Scheduling: guides/scheduling.md
+    - Text-to-Speech: guides/tts.md
+    - Device Management: guides/device-management.md
+    - Node Management: guides/node-management.md
+    - Usage Analytics: guides/usage-analytics.md
+    - Ops Management: guides/ops-management.md
     - Caching: guides/caching.md
     - Cost Tracking: guides/cost-tracking.md
     - Evaluation: guides/evaluation.md

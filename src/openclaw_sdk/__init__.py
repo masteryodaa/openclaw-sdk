@@ -7,7 +7,7 @@ from openclaw_sdk.__version__ import __version__
 # SDK startup may optionally warn when the connected OpenClaw is outside this range.
 __openclaw_compat__ = {
     "min": "2026.2.0",  # Minimum supported OpenClaw version
-    "max_tested": "2026.2.26",  # Highest version tested against
+    "max_tested": "2026.2.28",  # Highest version tested against
 }
 
 from openclaw_sdk.core.agent import Agent
@@ -63,6 +63,11 @@ from openclaw_sdk.core.exceptions import (
     WorkflowError,
 )
 from openclaw_sdk.core.types import (
+    AgentFileContent,
+    AgentFileInfo,
+    AgentIdentity,
+    AgentListItem,
+    AgentListResponse,
     AgentSummary,
     Attachment,
     ContentBlock,
@@ -85,7 +90,12 @@ from openclaw_sdk.core.types import (
 from openclaw_sdk.memory.config import MemoryConfig
 from openclaw_sdk.scheduling.manager import CronJob, ScheduleConfig, ScheduleManager
 from openclaw_sdk.skills.clawhub import ClawHub, ClawHubSkill
-from openclaw_sdk.skills.config import SkillEntry, SkillInstallConfig, SkillLoadConfig, SkillsConfig
+from openclaw_sdk.skills.config import (
+    SkillEntry,
+    SkillInstallConfig,
+    SkillLoadConfig,
+    SkillsConfig,
+)
 from openclaw_sdk.skills.manager import SkillInfo, SkillManager
 from openclaw_sdk.approvals.manager import ApprovalManager
 from openclaw_sdk.cache.base import InMemoryCache, ResponseCache
@@ -99,6 +109,7 @@ from openclaw_sdk.config.manager import ConfigManager, KNOWN_PROVIDERS
 from openclaw_sdk.devices.manager import DeviceManager
 from openclaw_sdk.nodes.manager import NodeManager
 from openclaw_sdk.ops.manager import OpsManager
+from openclaw_sdk.tts.manager import TTSManager
 from openclaw_sdk.tracing.otel import OTelCallbackHandler
 from openclaw_sdk.tracing.span import Span
 from openclaw_sdk.tracing.tracer import Tracer, TracingCallbackHandler
@@ -111,7 +122,12 @@ from openclaw_sdk.evaluation.evaluators import (
     LengthEvaluator,
     RegexEvaluator,
 )
-from openclaw_sdk.evaluation.eval_suite import EvalCase, EvalCaseResult, EvalReport, EvalSuite
+from openclaw_sdk.evaluation.eval_suite import (
+    EvalCase,
+    EvalCaseResult,
+    EvalReport,
+    EvalSuite,
+)
 from openclaw_sdk.tools.policy import (
     ElevatedPolicy,
     ExecPolicy,
@@ -309,6 +325,11 @@ __all__ = [
     "VoiceError",
     "WorkflowError",
     # Types
+    "AgentFileContent",
+    "AgentFileInfo",
+    "AgentIdentity",
+    "AgentListItem",
+    "AgentListResponse",
     "Attachment",
     "ContentBlock",
     "ToolCall",
@@ -363,6 +384,7 @@ __all__ = [
     "ApprovalManager",
     "NodeManager",
     "OpsManager",
+    "TTSManager",
     # Cache
     "ResponseCache",
     "InMemoryCache",

@@ -9,13 +9,30 @@
 
 | Metric | Value |
 |--------|-------|
-| Tests | 1299 passing |
+| Tests | 1621 passing (1522 unit + 99 live) |
 | Coverage | 97%+ |
-| mypy | 0 errors (159 files) |
+| mypy | 0 errors (strict) |
 | ruff | 0 issues |
 | Python | 3.11+ |
-| Version | v2.0.0 |
-| Exports | 225 public symbols |
+| Version | v2.1.0 |
+| Exports | 263 public symbols |
+| Gateway Methods | 81 facade methods |
+
+---
+
+## v2.1.0 — Gateway Coverage Expansion (Sprint 6)
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Agent CRUD & Files (Phase 6A) | DONE | 7 methods: agents.create/list/delete/rename, agents.files.get/set/list, agents.identity |
+| Exec Approvals (Phase 6B) | DONE | 6 methods: request/waitDecision/resolve, settings get/set, node settings |
+| Usage & Analytics (Phase 6C) | DONE | 3 methods: usage.status, usage.cost, sessions.usage |
+| Device Pairing (Phase 6D) | DONE | 4 methods: device.paired, device.approve/reject/remove |
+| Skills via Gateway (Phase 6E) | DONE | 4 methods: skills.status/bins/install/update |
+| Models/Tools/System (Phase 6F) | DONE | 4 methods: models.list, tools.catalog, system.status, memory.status |
+| Node Expansion (Phase 6G) | DONE | 8 methods: node.rename/invoke/emit, node.pair request/list/approve/reject/verify |
+| TTS/Wizard/Voice/Misc (Phase 6H) | DONE | 19 methods: tts.*, wizard.*, voice.wake.*, system.event, heartbeat, secrets, update |
+| Quality Gate (Phase 6Z) | DONE | 1621 tests (1522 unit + 99 live), mypy clean, ruff clean, v2.1.0 |
 
 ---
 
@@ -114,6 +131,7 @@
 - `OpenAICompatGateway` — HTTP adapter via httpx
 - `LocalGateway` — auto-connect to local OpenClaw
 - `MockGateway` — in-memory for testing
+- 81 facade methods covering agents, approvals, usage, devices, skills, nodes, TTS, voice, system
 
 ### Python-Native Features
 - `InMemoryCache` / `SemanticCache` — response caching
@@ -136,10 +154,11 @@
 
 ### Quality
 - `py.typed` marker (PEP 561)
-- 1299 tests, 97%+ coverage
-- E2E verified against live OpenClaw post-2026.2.26 (dev build) gateway
-- 93 gateway methods verified (up from ~30), 19 events discovered
-- mypy clean (159 files), ruff clean
+- 1621 tests (1522 unit + 99 live integration), 97%+ coverage
+- E2E verified against live OpenClaw 2026.2.28 gateway
+- mypy --strict clean, ruff clean
+- 81 gateway facade methods (up from ~30 in v2.0.0)
+- 263 public symbols exported
 - MkDocs Material documentation site (55+ pages)
 - Command Center with 19 routers, 17 tabs, all API-tested against live gateway
 

@@ -18,6 +18,7 @@ from openclaw_sdk.devices.manager import DeviceManager
 from openclaw_sdk.nodes.manager import NodeManager
 from openclaw_sdk.ops.manager import OpsManager
 from openclaw_sdk.scheduling.manager import ScheduleManager
+from openclaw_sdk.tts.manager import TTSManager
 from openclaw_sdk.skills.clawhub import ClawHub
 from openclaw_sdk.skills.manager import SkillManager
 from openclaw_sdk.webhooks.manager import WebhookManager
@@ -78,12 +79,11 @@ class OpenClawClient:
         self._nodes: NodeManager | None = None
         self._ops: OpsManager | None = None
         self._devices: DeviceManager | None = None
+        self._tts: TTSManager | None = None
 
     def __repr__(self) -> str:
         connected = getattr(self._gateway, "_connected", False)
-        return (
-            f"OpenClawClient(mode={self._config.mode!r}, connected={connected})"
-        )
+        return f"OpenClawClient(mode={self._config.mode!r}, connected={connected})"
 
     # ------------------------------------------------------------------ #
     # Factory
@@ -140,7 +140,9 @@ class OpenClawClient:
             )
 
         if config.openai_base_url is not None:
-            from openclaw_sdk.gateway.openai_compat import OpenAICompatGateway  # noqa: PLC0415
+            from openclaw_sdk.gateway.openai_compat import (
+                OpenAICompatGateway,
+            )  # noqa: PLC0415
 
             return OpenAICompatGateway(config.openai_base_url, api_key=config.api_key)
 
@@ -183,9 +185,9 @@ class OpenClawClient:
 
     @property
     def skills(self) -> SkillManager:
-        """Manager for installed OpenClaw skills (CLI-backed)."""
+        """Manager for installed OpenClaw skills (CLI + gateway RPC)."""
         if self._skills is None:
-            self._skills = SkillManager()
+            self._skills = SkillManager(gateway=self._gateway)
         return self._skills
 
     @property
@@ -244,6 +246,13 @@ class OpenClawClient:
             self._devices = DeviceManager(self._gateway)
         return self._devices
 
+    @property
+    def tts(self) -> TTSManager:
+        """Manager for text-to-speech operations."""
+        if self._tts is None:
+            self._tts = TTSManager(self._gateway)
+        return self._tts
+
     # ------------------------------------------------------------------ #
     # Agent & pipeline helpers
     # ------------------------------------------------------------------ #
@@ -264,36 +273,23 @@ class OpenClawClient:
 
         return Agent(self, agent_id, session_name)
 
-    async def create_agent(self, config: AgentConfig) -> "Agent":
-        """Create a new agent on the gateway via read-modify-write on config.
+    async def create_agent(self, config: AgentConfig, *, workspace: str | None = None) -> "Agent":
+        """Create a new agent on the gateway.
 
-        Reads the current config with ``config.get``, merges the new agent
-        definition, then writes back with ``config.set``.
-
-        When *tool_policy* or *mcp_servers* are set on *config*, uses the
-        OpenClaw-native serialization via :meth:`AgentConfig.to_openclaw_agent`.
+        Uses the ``agents.create`` gateway RPC method to register the agent.
 
         Args:
             config: :class:`~openclaw_sdk.core.config.AgentConfig` for the new agent.
+            workspace: Optional workspace path. The gateway requires this field;
+                defaults to ``"."`` (current directory) if not provided.
 
         Returns:
             An :class:`~openclaw_sdk.core.agent.Agent` connected to the new agent.
         """
         from openclaw_sdk.core.agent import Agent  # noqa: PLC0415
 
-        current = await self._gateway.call("config.get", {})
-        raw_str = current.get("raw", "{}")
-        parsed = json.loads(raw_str) if isinstance(raw_str, str) else {}
-
-        if "agents" not in parsed:
-            parsed["agents"] = {}
-
-        agent_data = config.to_openclaw_agent()
-
-        parsed["agents"][config.agent_id] = agent_data
-
-        new_raw = json.dumps(parsed, indent=2)
-        await self._gateway.call("config.set", {"raw": new_raw})
+        name = config.name or config.agent_id
+        await self._gateway.agents_create(name, workspace=workspace or ".")
         return Agent(self, config.agent_id)
 
     async def create_agent_from_template(
@@ -320,40 +316,31 @@ class OpenClawClient:
         return await self.create_agent(config)
 
     async def list_agents(self) -> list[AgentSummary]:
-        """List all agent sessions known to the gateway.
+        """List all agents known to the gateway.
 
-        Gateway method: ``sessions.list``
+        Gateway method: ``agents.list``
 
         Returns:
             List of :class:`~openclaw_sdk.core.types.AgentSummary` objects.
         """
-        result = await self._gateway.call("sessions.list", {})
+        result = await self._gateway.agents_list()
         summaries: list[AgentSummary] = []
-        for session in result.get("sessions", []):
-            # Session objects use "key" (not "sessionKey") — verified
-            key = session.get("key", "")
-            # Session key format: "agent:{agent_id}:{session_name}"
-            parts = key.split(":", 2)
-            agent_id = parts[1] if len(parts) >= 2 else key
-            status_str = session.get("status", "idle")
-            try:
-                status = AgentStatus(status_str)
-            except ValueError:
-                status = AgentStatus.IDLE
+        for agent in result.get("agents", []):
+            agent_id = agent.get("id", "")
             summaries.append(
                 AgentSummary(
                     agent_id=agent_id,
-                    name=session.get("name"),
-                    status=status,
+                    name=agent.get("name"),
+                    status=AgentStatus.IDLE,
                 )
             )
         return summaries
 
     async def delete_agent(self, agent_id: str) -> bool:
-        """Delete an agent and all its sessions from the gateway.
+        """Delete an agent from the gateway.
 
-        Gateway method: ``sessions.delete``
-        Verified param: ``{key}``
+        Gateway method: ``agents.delete``
+        Verified param: ``{agentId}``
 
         Args:
             agent_id: The agent's identifier to delete.
@@ -361,10 +348,7 @@ class OpenClawClient:
         Returns:
             ``True`` on success.
         """
-        await self._gateway.call(
-            "sessions.delete",
-            {"key": f"agent:{agent_id}:main"},
-        )
+        await self._gateway.agents_delete(agent_id)
         return True
 
     async def configure_channel(self, config: "ChannelConfig") -> dict[str, Any]:

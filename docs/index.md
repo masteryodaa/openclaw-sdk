@@ -9,7 +9,7 @@ hide:
 
 <span class="oc-mascot">🐸</span>
 
-<div class="oc-badge">v2.0 — Autonomous Agent SDK</div>
+<div class="oc-badge">v2.1 — Autonomous Agent SDK</div>
 
 # The Last Framework <span class="oc-glow">You'll Ever Need</span>
 
@@ -17,7 +17,7 @@ hide:
 
 <div class="oc-sub">
 Build AI agents that create their own tools, control computers, browse the web,
-and talk across 10+ messaging channels — all from Python. 225+ exports, 1299 tests, production-ready. No chains. No boilerplate. Just vibes.
+and talk across 10+ messaging channels — all from Python. 263 exports, 1621 tests, production-ready. No chains. No boilerplate. Just vibes.
 </div>
 
 <div class="oc-btns">

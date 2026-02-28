@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "openclaw-sdk"
-version = "2.0.1"
+version = "2.1.0"
 description = "Python SDK for the OpenClaw autonomous AI agent framework"
 authors = ["Ujjwal Kumar <kujjwal42@gmail.com>"]
 license = "MIT"
@@ -53,6 +53,7 @@ pytest-cov = ">=4.0"
 mypy = ">=1.0"
 ruff = ">=0.1"
 black = ">=23.0"
+cryptography = "^46.0.5"
 
 [build-system]
 requires = ["poetry-core"]

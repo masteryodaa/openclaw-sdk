@@ -151,7 +151,7 @@ The SDK declares which OpenClaw versions it supports:
 import openclaw_sdk
 
 print(openclaw_sdk.__openclaw_compat__)
-# {'min': '2026.2.0', 'max_tested': '2026.2.26'}
+# {'min': '2026.2.0', 'max_tested': '2026.2.28'}
 ```
 
 ## Next Steps

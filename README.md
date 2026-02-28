@@ -280,9 +280,11 @@ async with OpenClawClient.connect(**config.model_dump()) as client:
 
 ## Compatibility Matrix
 
-| openclaw-sdk | Python | pydantic | websockets |
-|-------------|--------|----------|-----------|
-| 0.1.x | 3.11, 3.12 | >= 2.0 | >= 12.0 |
+| openclaw-sdk | Python | OpenClaw | pydantic | websockets |
+|-------------|--------|----------|----------|-----------|
+| 2.1.x | 3.11, 3.12, 3.13 | 2026.2.0+ | >= 2.0 | >= 12.0 |
+| 2.0.x | 3.11, 3.12, 3.13 | 2026.2.0+ | >= 2.0 | >= 12.0 |
+| 1.x | 3.11, 3.12 | 2026.2.0+ | >= 2.0 | >= 12.0 |
 
 ---
 
@@ -290,7 +292,7 @@ async with OpenClawClient.connect(**config.model_dump()) as client:
 
 ```bash
 # Clone and install
-git clone https://github.com/openclaw/openclaw-sdk
+git clone https://github.com/masteryodaa/openclaw-sdk
 cd openclaw-sdk
 pip install -e ".[fastapi]"
 pip install pytest pytest-asyncio pytest-cov mypy ruff

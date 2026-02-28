@@ -165,6 +165,28 @@ class ConfigManager:
         return await self._gateway.call("config.apply", params)
 
     # ------------------------------------------------------------------ #
+    # Discovery — live model & tool queries
+    # ------------------------------------------------------------------ #
+
+    async def discover_models(self) -> dict[str, Any]:
+        """Discover available models from the live gateway.
+
+        Gateway method: ``models.list``
+
+        Returns the full ``models.list`` response with all providers and models.
+        """
+        return await self._gateway.call("models.list", {})
+
+    async def discover_tools(self) -> dict[str, Any]:
+        """Discover available tools from the live gateway.
+
+        Gateway method: ``tools.catalog``
+
+        Returns the full ``tools.catalog`` response with profiles and tool groups.
+        """
+        return await self._gateway.call("tools.catalog", {})
+
+    # ------------------------------------------------------------------ #
     # High-level helpers — model & provider switching
     # ------------------------------------------------------------------ #
 
@@ -285,7 +307,9 @@ class ConfigManager:
                 agent_cfg["model"] = {"primary": model_full}
         elif provider is not None and existing_primary:
             # Provider changed but model not specified — update provider prefix
-            old_model_name = existing_primary.split("/", 1)[1] if "/" in existing_primary else existing_primary
+            old_model_name = (
+                existing_primary.split("/", 1)[1] if "/" in existing_primary else existing_primary
+            )
             model_full = f"{provider}/{old_model_name}"
             if isinstance(existing_model, dict):
                 existing_model["primary"] = model_full

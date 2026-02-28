@@ -1,4 +1,5 @@
 """Tests for templates/registry.py and client.create_agent_from_template."""
+
 from __future__ import annotations
 
 import pytest
@@ -10,7 +11,6 @@ from openclaw_sdk.gateway.mock import MockGateway
 from openclaw_sdk.templates.registry import get_template, list_templates, TEMPLATES
 from openclaw_sdk.tools.policy import ToolPolicy
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -21,9 +21,14 @@ def _make_client(mock: MockGateway) -> OpenClawClient:
 
 
 def _register_config_methods(mock: MockGateway) -> None:
-    """Register mock responses for config.get and config.set (used by create_agent)."""
-    mock.register("config.get", {"raw": "{}", "path": "", "exists": True, "parsed": {}})
-    mock.register("config.set", {"ok": True})
+    """Register mock responses for agents.create (used by create_agent)."""
+    mock.register(
+        "agents.create",
+        lambda p: {
+            "id": p["name"] if p else "agent",
+            "name": p.get("name", "agent") if p else "agent",
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -107,9 +112,15 @@ def test_all_templates_valid() -> None:
     """Every template in TEMPLATES must produce a valid AgentConfig."""
     for name in TEMPLATES:
         config = get_template(name)
-        assert isinstance(config, AgentConfig), f"Template '{name}' did not produce AgentConfig"
-        assert config.agent_id == name, f"Template '{name}' has wrong agent_id: {config.agent_id}"
-        assert len(config.system_prompt) > 0, f"Template '{name}' has empty system_prompt"
+        assert isinstance(
+            config, AgentConfig
+        ), f"Template '{name}' did not produce AgentConfig"
+        assert (
+            config.agent_id == name
+        ), f"Template '{name}' has wrong agent_id: {config.agent_id}"
+        assert (
+            len(config.system_prompt) > 0
+        ), f"Template '{name}' has empty system_prompt"
 
 
 def test_all_templates_have_tool_policy() -> None:
@@ -134,8 +145,7 @@ async def test_create_agent_from_template() -> None:
 
     agent = await client.create_agent_from_template("assistant")
     assert agent.agent_id == "assistant"
-    mock.assert_called("config.get")
-    mock.assert_called("config.set")
+    mock.assert_called("agents.create")
     await mock.close()
 
 
@@ -146,7 +156,9 @@ async def test_template_override_agent_id() -> None:
     await mock.connect()
     client = _make_client(mock)
 
-    agent = await client.create_agent_from_template("assistant", agent_id="my-custom-bot")
+    agent = await client.create_agent_from_template(
+        "assistant", agent_id="my-custom-bot"
+    )
     assert agent.agent_id == "my-custom-bot"
     await mock.close()
 
@@ -188,6 +200,6 @@ async def test_create_agent_from_template_customer_support() -> None:
 
     agent = await client.create_agent_from_template("customer-support")
     assert agent.agent_id == "customer-support"
-    # Verify that config.set was called (agent was actually created)
-    assert mock.call_count("config.set") == 1
+    # Verify that agents.create was called (agent was actually created)
+    assert mock.call_count("agents.create") == 1
     await mock.close()

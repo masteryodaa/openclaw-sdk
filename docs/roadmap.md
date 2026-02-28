@@ -4,7 +4,17 @@ This page outlines planned features and the broader **OpenClaw ecosystem** visio
 
 ---
 
-## v2.1 — CLI Init Wizard
+## v2.1 — Gateway Coverage Expansion :white_check_mark: Released
+
+**Released:** 2026-02-28 | [Changelog](changelog.md)
+
+Expanded gateway facade from ~30 to **81 methods**, covering every OpenClaw gateway RPC endpoint.
+Added `TTSManager`, expanded `DeviceManager`, `NodeManager`, and `OpsManager`.
+Includes 99 live gateway integration tests verified against a real OpenClaw instance.
+
+---
+
+## v2.2 — CLI Init Wizard
 
 **Goal:** Zero-friction setup — `pip install openclaw-sdk` then one command to configure everything.
 
@@ -27,7 +37,7 @@ The wizard will walk you through interactive prompts:
 ? Output config to [~/.openclaw/sdk-config.json]:
 
 ✔ Config written to ~/.openclaw/sdk-config.json
-✔ Connection verified — gateway healthy (OpenClaw post-2026.2.26)
+✔ Connection verified — gateway healthy (OpenClaw 2026.2.3-1)
 
 You're ready! Try:
 
@@ -149,94 +159,6 @@ openclaw-sdk new
 
 ---
 
-## v2.2 — New Gateway Method Coverage (93 methods discovered)
-
-**Goal:** Wrap the 60+ newly discovered gateway methods that were previously unknown or invalid.
-
-As of 2026-02-28, a full gateway probe revealed **93 RPC methods** and **19 event types** -- far more than the ~30 originally documented. Many methods previously thought to be invalid (agents.*, exec.approval.*, usage.*, skills.*) are now confirmed working on post-2026.2.26 builds.
-
-### Agent CRUD Management
-
-Full lifecycle management of agents via `agents.list`, `agents.get`, `agents.create`, `agents.update`, `agents.delete`, `agents.duplicate`, `agents.export`:
-
-```python
-agents = await client.agents.list()
-new_agent = await client.agents.create(name="researcher", model="claude-opus-4-6")
-await client.agents.update(agent_id, instructions="You are a research assistant.")
-await client.agents.delete(agent_id)
-```
-
-### Agent Files API
-
-Read and write agent workspace files via `agents.files.list`, `agents.files.get`, `agents.files.set`:
-
-```python
-files = await agent.files.list()
-content = await agent.files.get("notes.md")
-await agent.files.set("config.json", '{"key": "value"}')
-```
-
-### Execution Approval System
-
-Full approval workflow via `exec.approval.list`, `exec.approval.get`, `exec.approval.resolve`, `exec.approval.resolveAll`, `exec.approval.config.get`, `exec.approval.config.set`, `exec.approval.autoRules.list`:
-
-```python
-pending = await client.approvals.list()
-await client.approvals.resolve(approval_id, action="approve")
-await client.approvals.resolve_all(agent_id, action="approve")
-```
-
-### Usage Tracking
-
-Monitor cost and usage via `usage.status`, `usage.cost`, and `sessions.usage`:
-
-```python
-status = await client.usage.status()
-costs = await client.usage.cost(period="month")
-session_usage = await agent.session_usage(session_key)
-```
-
-### Skills Management via Gateway
-
-Install, list, and manage skills via `skills.list`, `skills.get`, `skills.install`, `skills.remove`:
-
-```python
-installed = await client.skills.list()
-await client.skills.install("web-search")
-await client.skills.remove("unused-skill")
-```
-
-### TTS Integration
-
-Text-to-speech via gateway: `tts.speak`, `tts.stop`, `tts.voices`, `tts.status`, `tts.config.get`, `tts.config.set`:
-
-```python
-voices = await client.tts.voices()
-await client.tts.speak(text="Hello world", voice="alloy")
-await client.tts.stop()
-```
-
-### Models & Tools Discovery
-
-Discover available models and tool catalogs via `models.list` and `tools.catalog`:
-
-```python
-models = await client.models.list()
-tools = await client.tools.catalog()
-```
-
-### Device Management
-
-Enhanced device operations via `device.list`, `device.info`, `device.remove`, `device.token.rotate`, `device.token.revoke`, `device.setName`:
-
-```python
-devices = await client.devices.list()
-await client.devices.rotate_token(device_id)
-await client.devices.set_name(device_id, "my-server")
-```
-
----
-
 ## v2.3 — Ecosystem: OpenClaw Claw Suite
 
 The SDK will add first-class support for the broader **OpenClaw ecosystem**:
@@ -295,7 +217,7 @@ result = await bridge.call("skills.list")  # calls Node.js SDK directly
 Once the OpenClaw gateway implements `files.get` RPC, the SDK will expose:
 
 ```python
-# Currently raises GatewayError (not implemented in gateway ≤ post-2026.2.26)
+# Currently raises GatewayError (not implemented in gateway ≤ 2026.2.3-1)
 # Will work transparently once the gateway ships the method:
 file_bytes = await agent.get_file("output/report.pdf")
 ```

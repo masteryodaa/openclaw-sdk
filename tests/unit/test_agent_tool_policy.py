@@ -11,7 +11,6 @@ from openclaw_sdk.gateway.mock import MockGateway
 from openclaw_sdk.mcp.server import McpServer
 from openclaw_sdk.tools.policy import ToolPolicy
 
-
 # ------------------------------------------------------------------ #
 # Helpers
 # ------------------------------------------------------------------ #
@@ -299,13 +298,14 @@ class TestPatchAgentConfig:
 
 
 # ------------------------------------------------------------------ #
-# create_agent (client)
+# create_agent (client) — uses agents.create gateway RPC
 # ------------------------------------------------------------------ #
 
 
 class TestCreateAgentWithToolPolicy:
-    async def test_with_tool_policy_uses_to_openclaw_agent(self) -> None:
+    async def test_create_agent_calls_agents_create(self) -> None:
         client, mock = await _setup()
+        mock.register("agents.create", {"id": "policy-agent"})
         cfg = AgentConfig(
             agent_id="policy-agent",
             name="Policy Agent",
@@ -315,18 +315,14 @@ class TestCreateAgentWithToolPolicy:
         agent = await client.create_agent(cfg)
 
         assert agent.agent_id == "policy-agent"
-        _, params = _last_call(mock, "config.set")
+        mock.assert_called("agents.create")
+        _, params = _last_call(mock, "agents.create")
         assert params is not None
-        parsed = json.loads(params["raw"])
-        agent_data = parsed["agents"]["policy-agent"]
-        # to_openclaw_agent serialization: "tools" is a dict, not a list
-        assert isinstance(agent_data["tools"], dict)
-        assert agent_data["tools"]["profile"] == "coding"
-        assert "browser" in agent_data["tools"]["deny"]
-        assert agent_data["name"] == "Policy Agent"
+        assert params["name"] == "Policy Agent"
 
-    async def test_with_mcp_servers_includes_mcp_servers(self) -> None:
+    async def test_create_agent_with_mcp_servers(self) -> None:
         client, mock = await _setup()
+        mock.register("agents.create", {"id": "mcp-agent"})
         cfg = AgentConfig(
             agent_id="mcp-agent",
             mcp_servers={
@@ -338,32 +334,21 @@ class TestCreateAgentWithToolPolicy:
         agent = await client.create_agent(cfg)
 
         assert agent.agent_id == "mcp-agent"
-        _, params = _last_call(mock, "config.set")
-        assert params is not None
-        parsed = json.loads(params["raw"])
-        mcp = parsed["agents"]["mcp-agent"]["mcpServers"]
-        assert "postgres" in mcp
-        assert mcp["postgres"]["command"] == "uvx"
-        assert "remote" in mcp
-        assert mcp["remote"]["url"] == "http://example.com/mcp"
-        assert mcp["remote"]["transport"] == "streamable-http"
+        mock.assert_called("agents.create")
 
-    async def test_minimal_agent_creates_empty_config(self) -> None:
+    async def test_minimal_agent_creates_via_gateway(self) -> None:
         client, mock = await _setup()
+        mock.register("agents.create", {"id": "minimal-agent"})
         cfg = AgentConfig(agent_id="minimal-agent")
 
         agent = await client.create_agent(cfg)
 
         assert agent.agent_id == "minimal-agent"
-        _, params = _last_call(mock, "config.set")
-        assert params is not None
-        parsed = json.loads(params["raw"])
-        agent_data = parsed["agents"]["minimal-agent"]
-        # Default system_prompt is not serialized, tools not set → empty
-        assert "tools" not in agent_data
+        mock.assert_called("agents.create")
 
-    async def test_with_both_tool_policy_and_mcp_servers(self) -> None:
+    async def test_create_agent_returns_correct_agent(self) -> None:
         client, mock = await _setup()
+        mock.register("agents.create", {"id": "full-agent"})
         cfg = AgentConfig(
             agent_id="full-agent",
             name="Full Agent",
@@ -374,13 +359,7 @@ class TestCreateAgentWithToolPolicy:
             },
         )
 
-        await client.create_agent(cfg)
+        agent = await client.create_agent(cfg)
 
-        _, params = _last_call(mock, "config.set")
-        assert params is not None
-        parsed = json.loads(params["raw"])
-        agent_data = parsed["agents"]["full-agent"]
-        assert agent_data["name"] == "Full Agent"
-        assert agent_data["systemPrompt"] == "Custom prompt"
-        assert agent_data["tools"]["profile"] == "full"
-        assert "pg" in agent_data["mcpServers"]
+        assert agent.agent_id == "full-agent"
+        mock.assert_called("agents.create")

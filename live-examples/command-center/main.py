@@ -34,6 +34,7 @@ from app.routes_pipelines import router as pipelines_router
 from app.routes_schedules import router as schedules_router
 from app.routes_sessions import router as sessions_router
 from app.routes_templates import router as templates_router
+from app.routes_tts import router as tts_router
 from app.routes_webhooks import router as webhooks_router
 from app.routes_workflows import router as workflows_router
 
@@ -52,7 +53,7 @@ async def lifespan(app: FastAPI):
     await gateway.disconnect()
 
 
-app = FastAPI(title="OpenClaw Command Center", version="2.0.0", lifespan=lifespan)
+app = FastAPI(title="OpenClaw Command Center", version="2.1.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
@@ -77,6 +78,7 @@ app.include_router(templates_router)
 app.include_router(workflows_router)
 app.include_router(webhooks_router)
 app.include_router(autonomous_router)
+app.include_router(tts_router)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -89,7 +91,7 @@ if __name__ == "__main__":
 
     print()
     print("=" * 50)
-    print("  OpenClaw Command Center v2.0")
+    print("  OpenClaw Command Center v2.1")
     print("  http://127.0.0.1:8080")
     print("=" * 50)
     print()

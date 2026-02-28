@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64 as _b64
 from unittest.mock import AsyncMock, patch
 
 from openclaw_sdk.core.agent import Agent
@@ -88,52 +87,57 @@ async def test_execute_structured_passes_agent_self() -> None:
     assert args[0] is agent
 
 
-async def test_get_file_calls_files_get() -> None:
+async def test_get_file_calls_agents_files_get() -> None:
     mock = _make_connected_gateway()
-    mock.register("files.get", {"content": "aGVsbG8=", "encoding": "base64"})
+    mock.register(
+        "agents.files.get",
+        {
+            "agentId": "test-bot",
+            "file": {"name": "report.csv", "content": "a,b,c"},
+        },
+    )
     agent = _make_agent(mock)
 
-    await agent.get_file("/outputs/report.csv")
+    result = await agent.get_file("report.csv")
 
     mock.assert_called_with(
-        "files.get",
-        {"sessionKey": "agent:test-bot:main", "path": "/outputs/report.csv"},
+        "agents.files.get",
+        {"agentId": "test-bot", "name": "report.csv"},
     )
+    assert result["file"]["content"] == "a,b,c"
 
 
-async def test_get_file_decodes_base64() -> None:
+async def test_get_file_returns_dict() -> None:
     mock = _make_connected_gateway()
-    raw = b"hello world"
-    encoded = _b64.b64encode(raw).decode()
-    mock.register("files.get", {"content": encoded, "encoding": "base64"})
+    mock.register(
+        "agents.files.get",
+        {
+            "agentId": "test-bot",
+            "file": {"name": "file.txt", "content": "plain text", "size": 10},
+        },
+    )
     agent = _make_agent(mock)
 
-    result = await agent.get_file("/outputs/file.txt")
+    result = await agent.get_file("file.txt")
 
-    assert result == raw
+    assert isinstance(result, dict)
+    assert result["file"]["name"] == "file.txt"
 
 
-async def test_get_file_returns_bytes_for_plain_string() -> None:
+async def test_get_file_uses_agent_id() -> None:
     mock = _make_connected_gateway()
-    mock.register("files.get", {"content": "plain text"})
-    agent = _make_agent(mock)
-
-    result = await agent.get_file("/outputs/file.txt")
-
-    assert result == b"plain text"
-
-
-async def test_get_file_uses_agent_session_key() -> None:
-    mock = _make_connected_gateway()
-    mock.register("files.get", {"content": ""})
+    mock.register(
+        "agents.files.get",
+        {"agentId": "mybot", "file": {"name": "x.bin", "content": ""}},
+    )
     client = _make_client(mock)
     agent = Agent(client, "mybot", "alpha")
 
-    await agent.get_file("/path/x.bin")
+    await agent.get_file("x.bin")
 
     mock.assert_called_with(
-        "files.get",
-        {"sessionKey": "agent:mybot:alpha", "path": "/path/x.bin"},
+        "agents.files.get",
+        {"agentId": "mybot", "name": "x.bin"},
     )
 
 
@@ -174,9 +178,7 @@ async def test_get_memory_status_calls_sessions_preview() -> None:
 
     await agent.get_memory_status()
 
-    mock.assert_called_with(
-        "sessions.preview", {"keys": ["agent:test-bot:main"]}
-    )
+    mock.assert_called_with("sessions.preview", {"keys": ["agent:test-bot:main"]})
 
 
 async def test_get_memory_status_returns_dict() -> None:
@@ -201,9 +203,7 @@ async def test_get_status_calls_sessions_resolve() -> None:
 
     await agent.get_status()
 
-    mock.assert_called_with(
-        "sessions.resolve", {"key": "agent:test-bot:main"}
-    )
+    mock.assert_called_with("sessions.resolve", {"key": "agent:test-bot:main"})
 
 
 async def test_get_status_returns_agent_status_enum() -> None:

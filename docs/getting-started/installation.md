@@ -81,9 +81,9 @@ The SDK connects to an OpenClaw gateway. Make sure you have OpenClaw running:
 
 | openclaw-sdk | Python | OpenClaw | pydantic |
 |-------------|--------|----------|----------|
+| 2.1.x | 3.11, 3.12, 3.13 | 2026.2.0+ | >= 2.0 |
 | 2.0.x | 3.11, 3.12, 3.13 | 2026.2.0+ | >= 2.0 |
-| 0.2.x | 3.11, 3.12, 3.13 | 2026.2.0+ | >= 2.0 |
-| 0.1.x | 3.11, 3.12 | 2026.2.0+ | >= 2.0 |
+| 1.x | 3.11, 3.12 | 2026.2.0+ | >= 2.0 |
 
 ## Next Steps
 

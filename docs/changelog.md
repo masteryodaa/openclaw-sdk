@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.0] — 2026-02-28
+
+### Added — Gateway Coverage Expansion
+
+- **55 new gateway facade methods** — full coverage of agents, approvals, usage, devices, skills, nodes, TTS, wizard, voice, and system operations
+- **New managers**: `TTSManager`, expanded `DeviceManager`, `NodeManager`, `OpsManager`
+- **Live gateway integration tests** — 99 tests covering all 81 facade methods against a real OpenClaw gateway
+- **Agent CRUD lifecycle** — create, list, update, delete agents plus file management (`agents.files.get/set/list`)
+- **Execution approvals** — request, resolve, wait for approval decisions with settings management
+- **Usage analytics** — real-time usage status, cost tracking, and session usage via gateway RPC
+- **TTS operations** — enable/disable, provider selection, status, and voice wake word configuration
+- **Wizard flow** — start, monitor, and cancel setup wizards programmatically
+
+### Fixed
+
+- `ScheduleManager.create_schedule` — auto-wraps string schedule/payload into gateway-required object format
+- `OpenClawClient.create_agent` — passes `workspace` parameter (gateway requires it)
+
+### Stats
+
+- 1,621 tests (1,522 unit + 99 live integration), 97%+ coverage
+- 263 public symbols, 81 gateway facade methods
+- `mypy --strict` clean, `ruff` clean
+
+---
+
 ## [2.0.1] — 2026-02-24
 
 ### Fixed
@@ -123,7 +149,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 10 example scripts
 - `docs/quickstart.md`, `docs/protocol.md`
 
-[2.0.0]: https://github.com/openclaw-sdk/openclaw-sdk/compare/v1.0.0...v2.0.0
-[1.0.0]: https://github.com/openclaw-sdk/openclaw-sdk/compare/v0.2.0...v1.0.0
-[0.2.0]: https://github.com/openclaw-sdk/openclaw-sdk/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/openclaw-sdk/openclaw-sdk/releases/tag/v0.1.0
+[2.1.0]: https://github.com/masteryodaa/openclaw-sdk/compare/v2.0.1...v2.1.0
+[2.0.1]: https://github.com/masteryodaa/openclaw-sdk/compare/v2.0.0...v2.0.1
+[2.0.0]: https://github.com/masteryodaa/openclaw-sdk/compare/v1.0.0...v2.0.0
+[1.0.0]: https://github.com/masteryodaa/openclaw-sdk/compare/v0.2.0...v1.0.0
+[0.2.0]: https://github.com/masteryodaa/openclaw-sdk/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/masteryodaa/openclaw-sdk/releases/tag/v0.1.0

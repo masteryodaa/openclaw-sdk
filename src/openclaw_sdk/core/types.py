@@ -136,13 +136,15 @@ class TokenUsage(BaseModel):
         input_val = data.get("input", 0)
         output_val = data.get("output", 0)
         total_val = data.get("totalTokens", 0) or (input_val + output_val)
-        return cls.model_validate({
-            "input": input_val,
-            "output": output_val,
-            "cacheRead": data.get("cacheRead", 0),
-            "cacheWrite": data.get("cacheWrite", 0),
-            "totalTokens": total_val,
-        })
+        return cls.model_validate(
+            {
+                "input": input_val,
+                "output": output_val,
+                "cacheRead": data.get("cacheRead", 0),
+                "cacheWrite": data.get("cacheWrite", 0),
+                "totalTokens": total_val,
+            }
+        )
 
     @property
     def total(self) -> int:
@@ -172,9 +174,7 @@ class ExecutionResult(BaseModel):
     thinking: str | None = None
     latency_ms: int = 0
     token_usage: TokenUsage = Field(default_factory=TokenUsage)
-    completed_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    completed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     stop_reason: str | None = None
     """Stop reason: ``"complete"``, ``"aborted"``, ``"error"``, ``"timeout"``."""
     error_message: str | None = None
@@ -260,6 +260,50 @@ class ErrorEvent(TypedStreamEvent):
 
     event_type: EventType = EventType.ERROR
     message: str = ""
+
+
+class AgentListItem(BaseModel):
+    """Lightweight agent entry from ``agents.list``."""
+
+    model_config = {"populate_by_name": True}
+    id: str
+
+
+class AgentListResponse(BaseModel):
+    """Response from ``agents.list``."""
+
+    model_config = {"populate_by_name": True}
+    default_id: str | None = Field(default=None, alias="defaultId")
+    main_key: str | None = Field(default=None, alias="mainKey")
+    scope: str | None = None
+    agents: list[AgentListItem] = Field(default_factory=list)
+
+
+class AgentIdentity(BaseModel):
+    """Response from ``agent.identity.get``."""
+
+    model_config = {"populate_by_name": True}
+    agent_id: str = Field(alias="agentId")
+    name: str | None = None
+    avatar: str | None = None
+    emoji: str | None = None
+
+
+class AgentFileInfo(BaseModel):
+    """File metadata from ``agents.files.list``."""
+
+    model_config = {"populate_by_name": True}
+    name: str
+    path: str | None = None
+    missing: bool = False
+    size: int | None = None
+    updated_at_ms: int | None = Field(default=None, alias="updatedAtMs")
+
+
+class AgentFileContent(AgentFileInfo):
+    """File with content from ``agents.files.get``."""
+
+    content: str | None = None
 
 
 class AgentSummary(BaseModel):

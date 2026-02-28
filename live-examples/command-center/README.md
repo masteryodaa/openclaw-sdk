@@ -1,7 +1,7 @@
 # OpenClaw Command Center
 
 Full-stack web dashboard for managing OpenClaw agents, powered by `openclaw-sdk`.
-Covers the entire SDK surface: chat, sessions, config, channels, schedules, and system ops.
+Covers the entire SDK surface: chat, sessions, config, channels, schedules, TTS, and system ops.
 
 ## Run
 
@@ -68,14 +68,24 @@ Open http://127.0.0.1:8080
 - Create, update, delete schedules
 - Run now (trigger immediately), run history
 
-### System
-- Gateway health monitoring
-- Node/presence information
-- Live log tailing
-- Approval resolution (approve/deny pending tool calls)
-- Device token management (rotate/revoke)
+### Text-to-Speech (v2.1)
+- TTS status and provider listing
+- Enable/disable TTS per gateway
+- Provider switching (Edge, OpenAI, ElevenLabs)
+- Text-to-speech conversion
 
-## API Endpoints (65+ total)
+### System & Ops (v2.1 expanded)
+- Gateway health monitoring
+- System status, memory/embedding health
+- Heartbeat management (view, enable/disable)
+- System event emission, secrets reload, update check
+- Usage analytics: provider quotas, cost breakdown, per-session usage
+- Node management: list, describe, rename, pairing approval/rejection
+- Device management: list paired, approve/reject pairing, remove, token rotate/revoke
+- Approval resolution (approve/deny pending tool calls)
+- Live log tailing
+
+## API Endpoints (85+ total)
 
 | Module | Endpoints |
 |--------|-----------|
@@ -90,13 +100,18 @@ Open http://127.0.0.1:8080
 | Observe | `GET /api/observe/costs`, costs/daily, costs/entries, costs/pricing, `DELETE /api/observe/costs`, `GET /api/observe/traces`, prompts CRUD |
 | Channels | `GET /api/channels/status`, login, login/wait, pairing-code, logout |
 | Schedules | `GET/POST/PATCH/DELETE /api/schedules`, run, runs |
-| Ops | `GET /api/ops/logs`, nodes, devices, `POST /api/ops/approvals/resolve`, device token rotate/revoke |
+| TTS | `GET /api/tts/status`, `GET /api/tts/providers`, `POST /api/tts/enable`, disable, provider, convert |
+| Ops | `GET /api/ops/logs`, system/status, system/memory, system/heartbeat, `POST /api/ops/system/heartbeats`, system/event, system/secrets-reload, system/update |
+| Usage | `GET /api/ops/usage/status`, usage/cost, usage/sessions |
+| Nodes | `GET /api/ops/nodes`, nodes/presence, nodes/pairs, nodes/{id}, `PATCH /api/ops/nodes/{id}/rename`, `POST /api/ops/nodes/pairs/approve`, pairs/reject |
+| Devices | `GET /api/ops/devices`, `POST /api/ops/devices/approve`, reject, remove, rotate-token, revoke-token |
+| Approvals | `POST /api/ops/approvals/resolve` |
 
 ## Structure
 
 ```
 command-center/
-  main.py                  # FastAPI entry point (v3.0)
+  main.py                  # FastAPI entry point (v2.1)
   app/
     __init__.py
     gateway.py             # Shared OpenClaw client singleton
@@ -111,7 +126,8 @@ command-center/
     routes_observe.py      # /api/observe — costs, traces, prompt versioning
     routes_channels.py     # /api/channels — status, login/logout, pairing
     routes_schedules.py    # /api/schedules — CRUD, run now, history
-    routes_ops.py          # /api/ops — logs, nodes, devices, approvals
+    routes_tts.py          # /api/tts — text-to-speech management
+    routes_ops.py          # /api/ops — logs, system, usage, nodes, devices, approvals
   static/
     index.html             # 10-tab single-page dashboard
 ```

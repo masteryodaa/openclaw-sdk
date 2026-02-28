@@ -91,9 +91,7 @@ class Gateway(ABC):
         """
         return await self.call("chat.abort", {"sessionKey": session_key})
 
-    async def chat_inject(
-        self, session_key: str, message: str
-    ) -> dict[str, Any]:
+    async def chat_inject(self, session_key: str, message: str) -> dict[str, Any]:
         """Inject a synthetic message into the conversation history.
 
         Gateway method: ``chat.inject``
@@ -147,17 +145,13 @@ class Gateway(ABC):
         """
         return await self.call("sessions.resolve", {"key": key})
 
-    async def sessions_patch(
-        self, key: str, patch: dict[str, Any]
-    ) -> dict[str, Any]:
+    async def sessions_patch(self, key: str, patch: dict[str, Any]) -> dict[str, Any]:
         """Apply a partial update to a session.
 
         Gateway method: ``sessions.patch``
         Verified params: ``{key, ...patch}``
         """
-        return await self.call(
-            "sessions.patch", {"key": key, **patch}
-        )
+        return await self.call("sessions.patch", {"key": key, **patch})
 
     async def sessions_reset(self, key: str) -> dict[str, Any]:
         """Reset (clear) a session's conversation history.
@@ -268,6 +262,85 @@ class Gateway(ABC):
             {"id": request_id, "decision": decision},
         )
 
+    async def exec_approval_request(
+        self,
+        command: str,
+        *,
+        timeout_ms: int | None = None,
+        agent_id: str | None = None,
+        session_key: str | None = None,
+        node_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Request approval for a command execution. Blocks until resolved.
+
+        Gateway method: ``exec.approval.request``
+        Returns ``{id, decision, createdAtMs, expiresAtMs}``.
+        Decision: ``"allow-once"`` | ``"allow-always"`` | ``"deny"`` | null (expired).
+        """
+        params: dict[str, Any] = {"command": command}
+        if timeout_ms is not None:
+            params["timeoutMs"] = timeout_ms
+        if agent_id is not None:
+            params["agentId"] = agent_id
+        if session_key is not None:
+            params["sessionKey"] = session_key
+        if node_id is not None:
+            params["nodeId"] = node_id
+        return await self.call("exec.approval.request", params)
+
+    async def exec_approval_wait_decision(self, approval_id: str) -> dict[str, Any]:
+        """Wait for an approval decision. Blocks until resolved.
+
+        Gateway method: ``exec.approval.waitDecision``
+        Returns ``{id, decision, createdAtMs, expiresAtMs}``.
+        """
+        return await self.call("exec.approval.waitDecision", {"id": approval_id})
+
+    async def exec_approvals_get(self) -> dict[str, Any]:
+        """Get approval settings/config.
+
+        Gateway method: ``exec.approvals.get``
+        Returns ``{path, exists, hash, file: {version, socket, defaults, agents}}``.
+        """
+        return await self.call("exec.approvals.get", {})
+
+    async def exec_approvals_set(
+        self, file: dict[str, Any], base_hash: str | None = None
+    ) -> dict[str, Any]:
+        """Set approval settings with optimistic concurrency.
+
+        Gateway method: ``exec.approvals.set``
+        Params: ``{file: {version, ...}, baseHash?}``
+        """
+        params: dict[str, Any] = {"file": file}
+        if base_hash is not None:
+            params["baseHash"] = base_hash
+        return await self.call("exec.approvals.set", params)
+
+    async def exec_approvals_node_get(self, node_id: str) -> dict[str, Any]:
+        """Get node-level approval settings. Proxied to node.
+
+        Gateway method: ``exec.approvals.node.get``
+        Unavailable if node is not connected.
+        """
+        return await self.call("exec.approvals.node.get", {"nodeId": node_id})
+
+    async def exec_approvals_node_set(
+        self,
+        node_id: str,
+        file: dict[str, Any],
+        base_hash: str | None = None,
+    ) -> dict[str, Any]:
+        """Set node-level approval settings. Proxied to node.
+
+        Gateway method: ``exec.approvals.node.set``
+        Params: ``{nodeId, file: {version, ...}, baseHash?}``
+        """
+        params: dict[str, Any] = {"nodeId": node_id, "file": file}
+        if base_hash is not None:
+            params["baseHash"] = base_hash
+        return await self.call("exec.approvals.node.set", params)
+
     # ------------------------------------------------------------------ #
     # Node / presence facade
     # ------------------------------------------------------------------ #
@@ -310,6 +383,73 @@ class Gateway(ABC):
             params["payload"] = payload
         return await self.call("node.invoke", params)
 
+    async def node_rename(self, node_id: str, display_name: str) -> dict[str, Any]:
+        """Rename a node.
+
+        Gateway method: ``node.rename``
+        """
+        return await self.call(
+            "node.rename", {"nodeId": node_id, "displayName": display_name}
+        )
+
+    async def node_invoke_result(self, **params: Any) -> dict[str, Any]:
+        """Submit an invoke result back to the gateway.
+
+        Gateway method: ``node.invoke.result``
+
+        Note:
+            Role-restricted — requires ``node`` role.
+        """
+        return await self.call("node.invoke.result", params)
+
+    async def node_event(self, **params: Any) -> dict[str, Any]:
+        """Emit a node event.
+
+        Gateway method: ``node.event``
+
+        Note:
+            Role-restricted — requires ``node`` role.
+        """
+        return await self.call("node.event", params)
+
+    async def node_pair_request(self, node_id: str) -> dict[str, Any]:
+        """Request node pairing.
+
+        Gateway method: ``node.pair.request``
+        """
+        return await self.call("node.pair.request", {"nodeId": node_id})
+
+    async def node_pair_list(self) -> dict[str, Any]:
+        """List pending and paired nodes.
+
+        Gateway method: ``node.pair.list``
+
+        Returns:
+            Dict with ``pending`` and ``paired`` arrays.
+        """
+        return await self.call("node.pair.list", {})
+
+    async def node_pair_approve(self, request_id: str) -> dict[str, Any]:
+        """Approve a node pairing request.
+
+        Gateway method: ``node.pair.approve``
+        """
+        return await self.call("node.pair.approve", {"requestId": request_id})
+
+    async def node_pair_reject(self, request_id: str) -> dict[str, Any]:
+        """Reject a node pairing request.
+
+        Gateway method: ``node.pair.reject``
+        """
+        return await self.call("node.pair.reject", {"requestId": request_id})
+
+    async def node_pair_verify(self, node_id: str, token: str) -> dict[str, Any]:
+        """Verify a node pairing.
+
+        Gateway method: ``node.pair.verify``
+        """
+        return await self.call("node.pair.verify", {"nodeId": node_id, "token": token})
+
     # ------------------------------------------------------------------ #
     # Ops facade
     # ------------------------------------------------------------------ #
@@ -344,12 +484,38 @@ class Gateway(ABC):
         }
 
     # ------------------------------------------------------------------ #
+    # Usage facade
+    # ------------------------------------------------------------------ #
+
+    async def usage_status(self) -> dict[str, Any]:
+        """Get provider usage status (quotas, limits, plans).
+
+        Gateway method: ``usage.status``
+        Returns ``{updatedAt, providers: [{provider, displayName, windows, plan}]}``
+        """
+        return await self.call("usage.status", {})
+
+    async def usage_cost(self) -> dict[str, Any]:
+        """Get detailed cost breakdown by day.
+
+        Gateway method: ``usage.cost``
+        Returns ``{updatedAt, days, daily: [...], totals: {...}}``
+        """
+        return await self.call("usage.cost", {})
+
+    async def sessions_usage(self) -> dict[str, Any]:
+        """Get per-session usage analytics.
+
+        Gateway method: ``sessions.usage``
+        Returns ``{updatedAt, startDate, endDate, sessions: [{key, usage: {...}}]}``
+        """
+        return await self.call("sessions.usage", {})
+
+    # ------------------------------------------------------------------ #
     # Device management facade
     # ------------------------------------------------------------------ #
 
-    async def device_token_rotate(
-        self, device_id: str, role: str
-    ) -> dict[str, Any]:
+    async def device_token_rotate(self, device_id: str, role: str) -> dict[str, Any]:
         """Rotate a device's auth token.
 
         Gateway method: ``device.token.rotate``
@@ -359,9 +525,7 @@ class Gateway(ABC):
             "device.token.rotate", {"deviceId": device_id, "role": role}
         )
 
-    async def device_token_revoke(
-        self, device_id: str, role: str
-    ) -> dict[str, Any]:
+    async def device_token_revoke(self, device_id: str, role: str) -> dict[str, Any]:
         """Revoke a device's auth token.
 
         Gateway method: ``device.token.revoke``
@@ -370,6 +534,357 @@ class Gateway(ABC):
         return await self.call(
             "device.token.revoke", {"deviceId": device_id, "role": role}
         )
+
+    async def device_pair_list(self) -> dict[str, Any]:
+        """List pending and paired devices.
+
+        Gateway method: ``device.pair.list``
+        Returns ``{pending: [...], paired: [...]}``
+        """
+        return await self.call("device.pair.list", {})
+
+    async def device_pair_approve(self, request_id: str) -> dict[str, Any]:
+        """Approve a device pairing request.
+
+        Gateway method: ``device.pair.approve``
+        Verified params: ``{requestId}``
+        """
+        return await self.call("device.pair.approve", {"requestId": request_id})
+
+    async def device_pair_reject(self, request_id: str) -> dict[str, Any]:
+        """Reject a device pairing request.
+
+        Gateway method: ``device.pair.reject``
+        Verified params: ``{requestId}``
+        """
+        return await self.call("device.pair.reject", {"requestId": request_id})
+
+    async def device_pair_remove(self, device_id: str) -> dict[str, Any]:
+        """Remove a paired device.
+
+        Gateway method: ``device.pair.remove``
+        Verified params: ``{deviceId}``
+        """
+        return await self.call("device.pair.remove", {"deviceId": device_id})
+
+    # ------------------------------------------------------------------ #
+    # Discovery facade
+    # ------------------------------------------------------------------ #
+
+    async def models_list(self) -> dict[str, Any]:
+        """List all available models across providers.
+
+        Gateway method: ``models.list``
+
+        Returns:
+            Dict with ``models`` array — each entry has ``id``, ``name``,
+            ``provider``, ``contextWindow``, ``reasoning``, and ``input``.
+        """
+        return await self.call("models.list", {})
+
+    async def tools_catalog(self) -> dict[str, Any]:
+        """Get the full tool catalog with profiles and groups.
+
+        Gateway method: ``tools.catalog``
+
+        Returns:
+            Dict with ``agentId``, ``profiles`` (list of profile descriptors),
+            and ``groups`` (list of tool groups with their tools).
+        """
+        return await self.call("tools.catalog", {})
+
+    async def system_status(self) -> dict[str, Any]:
+        """Get gateway system status.
+
+        Gateway method: ``status``
+
+        Returns:
+            Dict with ``linkChannel``, ``heartbeat``, ``channelSummary``,
+            ``queuedSystemEvents``, and ``sessions`` summary.
+        """
+        return await self.call("status", {})
+
+    async def doctor_memory_status(self) -> dict[str, Any]:
+        """Get memory/embedding health status.
+
+        Gateway method: ``doctor.memory.status``
+
+        Returns:
+            Dict with ``agentId``, ``provider``, and ``embedding``
+            (containing ``ok`` and optional ``error``).
+        """
+        return await self.call("doctor.memory.status", {})
+
+    # ------------------------------------------------------------------ #
+    # Skills facade
+    # ------------------------------------------------------------------ #
+
+    async def skills_status(self) -> dict[str, Any]:
+        """Get skills status and installed skill list.
+
+        Gateway method: ``skills.status``
+
+        Returns:
+            Dict with ``workspaceDir``, ``managedSkillsDir``, and ``skills``
+            array containing skill descriptors.
+        """
+        return await self.call("skills.status", {})
+
+    async def skills_bins(self) -> dict[str, Any]:
+        """Get skills binary information.
+
+        Gateway method: ``skills.bins``
+
+        Note:
+            Role-restricted — may return unauthorized for ``operator`` role.
+        """
+        return await self.call("skills.bins", {})
+
+    async def skills_install(self, name: str, install_id: str) -> dict[str, Any]:
+        """Install a skill.
+
+        Gateway method: ``skills.install``
+
+        Args:
+            name: The skill name to install.
+            install_id: Unique installation identifier.
+        """
+        return await self.call(
+            "skills.install", {"name": name, "installId": install_id}
+        )
+
+    async def skills_update(self, skill_key: str) -> dict[str, Any]:
+        """Update a skill.
+
+        Gateway method: ``skills.update``
+
+        Args:
+            skill_key: The skill key identifying the skill to update.
+        """
+        return await self.call("skills.update", {"skillKey": skill_key})
+
+    # ------------------------------------------------------------------ #
+    # Agents facade
+    # ------------------------------------------------------------------ #
+
+    async def agents_list(self) -> dict[str, Any]:
+        """List all agents. Gateway method: ``agents.list``"""
+        return await self.call("agents.list", {})
+
+    async def agents_create(
+        self, name: str, workspace: str | None = None
+    ) -> dict[str, Any]:
+        """Create a new agent. Gateway method: ``agents.create``"""
+        params: dict[str, Any] = {"name": name}
+        if workspace is not None:
+            params["workspace"] = workspace
+        return await self.call("agents.create", params)
+
+    async def agents_update(self, agent_id: str, **patch: Any) -> dict[str, Any]:
+        """Update an agent. Gateway method: ``agents.update``"""
+        return await self.call("agents.update", {"agentId": agent_id, **patch})
+
+    async def agents_delete(self, agent_id: str) -> dict[str, Any]:
+        """Delete an agent. Gateway method: ``agents.delete``"""
+        return await self.call("agents.delete", {"agentId": agent_id})
+
+    async def agents_files_list(self, agent_id: str) -> dict[str, Any]:
+        """List agent workspace files. Gateway method: ``agents.files.list``"""
+        return await self.call("agents.files.list", {"agentId": agent_id})
+
+    async def agents_files_get(self, agent_id: str, name: str) -> dict[str, Any]:
+        """Get agent file content. Gateway method: ``agents.files.get``"""
+        return await self.call("agents.files.get", {"agentId": agent_id, "name": name})
+
+    async def agents_files_set(
+        self, agent_id: str, name: str, content: str
+    ) -> dict[str, Any]:
+        """Set agent file content. Gateway method: ``agents.files.set``"""
+        return await self.call(
+            "agents.files.set",
+            {"agentId": agent_id, "name": name, "content": content},
+        )
+
+    async def agent_identity_get(self) -> dict[str, Any]:
+        """Get agent identity. Gateway method: ``agent.identity.get``"""
+        return await self.call("agent.identity.get", {})
+
+    # ------------------------------------------------------------------ #
+    # TTS facade
+    # ------------------------------------------------------------------ #
+
+    async def tts_enable(self) -> dict[str, Any]:
+        """Enable text-to-speech.
+
+        Gateway method: ``tts.enable``
+
+        Returns:
+            ``{enabled: true}``
+        """
+        return await self.call("tts.enable", {})
+
+    async def tts_disable(self) -> dict[str, Any]:
+        """Disable text-to-speech.
+
+        Gateway method: ``tts.disable``
+
+        Returns:
+            ``{enabled: false}``
+        """
+        return await self.call("tts.disable", {})
+
+    async def tts_convert(self, text: str) -> dict[str, Any]:
+        """Convert text to speech audio.
+
+        Gateway method: ``tts.convert``
+        Verified params: ``{text}``
+        """
+        return await self.call("tts.convert", {"text": text})
+
+    async def tts_set_provider(self, provider: str) -> dict[str, Any]:
+        """Set TTS provider.
+
+        Gateway method: ``tts.setProvider``
+        Verified params: ``{provider}`` — ``"openai"`` | ``"elevenlabs"`` | ``"edge"``
+        """
+        return await self.call("tts.setProvider", {"provider": provider})
+
+    async def tts_status(self) -> dict[str, Any]:
+        """Get TTS status.
+
+        Gateway method: ``tts.status``
+        """
+        return await self.call("tts.status", {})
+
+    async def tts_providers(self) -> dict[str, Any]:
+        """List available TTS providers.
+
+        Gateway method: ``tts.providers``
+        """
+        return await self.call("tts.providers", {})
+
+    # ------------------------------------------------------------------ #
+    # Wizard facade
+    # ------------------------------------------------------------------ #
+
+    async def wizard_start(self) -> dict[str, Any]:
+        """Start a wizard session.
+
+        Gateway method: ``wizard.start``
+        """
+        return await self.call("wizard.start", {})
+
+    async def wizard_next(self, session_id: str) -> dict[str, Any]:
+        """Advance to the next wizard step.
+
+        Gateway method: ``wizard.next``
+        Verified params: ``{sessionId}``
+        """
+        return await self.call("wizard.next", {"sessionId": session_id})
+
+    async def wizard_cancel(self, session_id: str) -> dict[str, Any]:
+        """Cancel a wizard session.
+
+        Gateway method: ``wizard.cancel``
+        Verified params: ``{sessionId}``
+        """
+        return await self.call("wizard.cancel", {"sessionId": session_id})
+
+    async def wizard_status(self, session_id: str) -> dict[str, Any]:
+        """Get wizard session state.
+
+        Gateway method: ``wizard.status``
+        Verified params: ``{sessionId}``
+        """
+        return await self.call("wizard.status", {"sessionId": session_id})
+
+    # ------------------------------------------------------------------ #
+    # Voice wake facade
+    # ------------------------------------------------------------------ #
+
+    async def voicewake_get(self) -> dict[str, Any]:
+        """Get voice wake triggers.
+
+        Gateway method: ``voicewake.get``
+
+        Returns:
+            ``{triggers: string[]}``
+        """
+        return await self.call("voicewake.get", {})
+
+    async def voicewake_set(self, triggers: list[str]) -> dict[str, Any]:
+        """Set voice wake triggers.
+
+        Gateway method: ``voicewake.set``
+        Verified params: ``{triggers: string[]}``
+        """
+        return await self.call("voicewake.set", {"triggers": triggers})
+
+    # ------------------------------------------------------------------ #
+    # System misc facade
+    # ------------------------------------------------------------------ #
+
+    async def system_event(self, text: str) -> dict[str, Any]:
+        """Emit a system event.
+
+        Gateway method: ``system-event``
+        Verified params: ``{text}``
+        """
+        return await self.call("system-event", {"text": text})
+
+    async def send_message(self, to: str, idempotency_key: str) -> dict[str, Any]:
+        """Send a message.
+
+        Gateway method: ``send``
+        Verified params: ``{to, idempotencyKey}``
+        """
+        return await self.call("send", {"to": to, "idempotencyKey": idempotency_key})
+
+    async def browser_request(self, method: str, path: str) -> dict[str, Any]:
+        """Proxy a browser request.
+
+        Gateway method: ``browser.request``
+        Verified params: ``{method, path}``
+        """
+        return await self.call("browser.request", {"method": method, "path": path})
+
+    async def last_heartbeat(self) -> dict[str, Any]:
+        """Get last heartbeat info.
+
+        Gateway method: ``last-heartbeat``
+
+        Returns:
+            ``{ts, status, reason, durationMs}``
+        """
+        return await self.call("last-heartbeat", {})
+
+    async def set_heartbeats(self, enabled: bool) -> dict[str, Any]:
+        """Enable or disable heartbeats.
+
+        Gateway method: ``set-heartbeats``
+        Verified params: ``{enabled: bool}``
+        """
+        return await self.call("set-heartbeats", {"enabled": enabled})
+
+    async def update_run(self) -> dict[str, Any]:
+        """Run a system update.
+
+        Gateway method: ``update.run``
+
+        Returns:
+            ``{ok, result: {status, mode, ...}, restart, sentinel}``
+        """
+        return await self.call("update.run", {})
+
+    async def secrets_reload(self) -> dict[str, Any]:
+        """Reload secrets from disk.
+
+        Gateway method: ``secrets.reload``
+
+        Returns:
+            ``{ok, warningCount}``
+        """
+        return await self.call("secrets.reload", {})
 
     # ------------------------------------------------------------------ #
     # Context manager support

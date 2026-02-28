@@ -58,11 +58,21 @@ class ScheduleManager:
         return await self._gateway.call("cron.status", {})
 
     async def create_schedule(self, config: ScheduleConfig) -> CronJob:
+        # Gateway requires schedule as {kind: "cron", expr: "..."} object
+        # and payload as {message: "..."} object.
+        schedule_obj: dict[str, str] | str = config.schedule
+        if isinstance(config.schedule, str):
+            schedule_obj = {"kind": "cron", "expr": config.schedule}
+
+        payload_obj: dict[str, str] | str = config.payload
+        if isinstance(config.payload, str):
+            payload_obj = {"message": config.payload}
+
         params: dict[str, Any] = {
             "name": config.name,
-            "schedule": config.schedule,
+            "schedule": schedule_obj,
             "sessionTarget": config.session_target,
-            "payload": config.payload,
+            "payload": payload_obj,
         }
         result = await self._gateway.call("cron.add", params)
         return CronJob(**result)

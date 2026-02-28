@@ -15,7 +15,6 @@ from openclaw_sdk.skills.config import (
     SkillsConfig,
 )
 
-
 # ------------------------------------------------------------------ #
 # SkillLoadConfig
 # ------------------------------------------------------------------ #
@@ -136,10 +135,12 @@ class TestSkillsConfig:
         assert "extraDirs" in result["load"]
 
     def test_to_openclaw_with_entries(self) -> None:
-        cfg = SkillsConfig(entries={
-            "my-skill": SkillEntry(api_key="key123"),
-            "disabled": SkillEntry(enabled=False),
-        })
+        cfg = SkillsConfig(
+            entries={
+                "my-skill": SkillEntry(api_key="key123"),
+                "disabled": SkillEntry(enabled=False),
+            }
+        )
         result = cfg.to_openclaw()
         assert result["entries"]["my-skill"]["apiKey"] == "key123"
         assert result["entries"]["disabled"]["enabled"] is False
@@ -173,7 +174,9 @@ class TestSkillsConfigFluent:
         assert cfg.allow_bundled.count("clawhub") == 1
 
     def test_with_clawhub_disabled_removes(self) -> None:
-        cfg = SkillsConfig(allow_bundled=["clawhub", "gemini"]).with_clawhub(enabled=False)
+        cfg = SkillsConfig(allow_bundled=["clawhub", "gemini"]).with_clawhub(
+            enabled=False
+        )
         assert cfg.allow_bundled is not None
         assert "clawhub" not in cfg.allow_bundled
         assert "gemini" in cfg.allow_bundled
@@ -342,7 +345,7 @@ class TestAgentDisableEnableSkill:
 class TestCreateAgentWithSkills:
     async def test_create_agent_with_skills_config(self) -> None:
         client, mock = await _setup()
-        mock.register("config.set", {"ok": True})
+        mock.register("agents.create", {"id": "skill-agent"})
 
         cfg = AgentConfig(
             agent_id="skill-agent",
@@ -355,14 +358,4 @@ class TestCreateAgentWithSkills:
         agent = await client.create_agent(cfg)
 
         assert agent.agent_id == "skill-agent"
-        # Check config.set was called with skills section
-        for m, p in reversed(mock.calls):
-            if m == "config.set":
-                assert p is not None
-                parsed = json.loads(p["raw"])
-                agent_data = parsed["agents"]["skill-agent"]
-                assert agent_data["skills"]["allowBundled"] == ["clawhub", "gemini"]
-                assert agent_data["skills"]["entries"]["web-scraper"]["apiKey"] == "key"
-                break
-        else:
-            raise AssertionError("config.set not called")
+        mock.assert_called("agents.create")

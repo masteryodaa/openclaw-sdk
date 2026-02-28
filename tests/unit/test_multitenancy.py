@@ -1,4 +1,5 @@
 """Tests for multitenancy module — Tenant, TenantConfig, TenantWorkspace."""
+
 from __future__ import annotations
 
 import pytest
@@ -11,7 +12,6 @@ from openclaw_sdk.gateway.mock import MockGateway
 from openclaw_sdk.multitenancy.tenant import Tenant, TenantConfig
 from openclaw_sdk.multitenancy.workspace import TenantWorkspace
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -23,6 +23,13 @@ async def _make_workspace() -> tuple[TenantWorkspace, MockGateway]:
     await mock.connect()
     mock.register("config.get", {"raw": "{}", "exists": True, "path": "/mock"})
     mock.register("config.set", {"ok": True})
+    mock.register(
+        "agents.create",
+        lambda p: {
+            "id": p["name"] if p else "agent",
+            "name": p.get("name", "agent") if p else "agent",
+        },
+    )
     client = OpenClawClient(config=ClientConfig(), gateway=mock)
     workspace = TenantWorkspace(client)
     return workspace, mock
@@ -228,9 +235,7 @@ class TestWorkspaceAgentCreation:
     @pytest.mark.asyncio
     async def test_create_agent_empty_allowed_models_permits_all(self) -> None:
         workspace, mock = await _make_workspace()
-        workspace.register_tenant(
-            _tenant_config("acme", "Acme", allowed_models=[])
-        )
+        workspace.register_tenant(_tenant_config("acme", "Acme", allowed_models=[]))
 
         # Empty allowed_models means no restriction
         agent = await workspace.create_agent(

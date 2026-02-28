@@ -74,32 +74,26 @@ async def test_properties_are_lazy_singletons() -> None:
 
 
 # ------------------------------------------------------------------ #
-# create_agent — read-modify-write via config.get + config.set
+# create_agent — uses agents.create gateway RPC
 # ------------------------------------------------------------------ #
 
 
-async def test_create_agent_reads_then_writes_config() -> None:
+async def test_create_agent_calls_agents_create() -> None:
     mock, client = _make_client()
-    mock.register("config.get", {"raw": '{"agents": {}}', "parsed": {"agents": {}}})
-    mock.register("config.set", {"ok": True})
+    mock.register("agents.create", {"id": "new-bot", "name": "new-bot"})
 
     config = AgentConfig(agent_id="new-bot", system_prompt="You are a bot")
     agent = await client.create_agent(config)
 
-    # Should call config.get first, then config.set
-    assert mock.calls[0][0] == "config.get"
-    assert mock.calls[1][0] == "config.set"
-    # The written raw string should contain the new agent
-    written_raw = mock.calls[1][1]["raw"]
-    parsed = json.loads(written_raw)
-    assert "new-bot" in parsed["agents"]
+    mock.assert_called("agents.create")
+    _, params = mock.calls[-1]
+    assert params["name"] == "new-bot"
     assert agent.agent_id == "new-bot"
 
 
 async def test_create_agent_returns_agent_with_correct_id() -> None:
     mock, client = _make_client()
-    mock.register("config.get", {"raw": "{}", "parsed": {}})
-    mock.register("config.set", {})
+    mock.register("agents.create", {"id": "researcher"})
 
     config = AgentConfig(agent_id="researcher")
     agent = await client.create_agent(config)
@@ -108,83 +102,56 @@ async def test_create_agent_returns_agent_with_correct_id() -> None:
     assert agent.session_key == "agent:researcher:main"
 
 
-async def test_create_agent_preserves_existing_agents() -> None:
-    mock, client = _make_client()
-    existing = {"agents": {"old-bot": {"system_prompt": "old"}}}
-    mock.register("config.get", {"raw": json.dumps(existing), "parsed": existing})
-    mock.register("config.set", {})
-
-    config = AgentConfig(agent_id="new-bot")
-    await client.create_agent(config)
-
-    written_raw = mock.calls[1][1]["raw"]
-    parsed = json.loads(written_raw)
-    assert "old-bot" in parsed["agents"]
-    assert "new-bot" in parsed["agents"]
-
-
 # ------------------------------------------------------------------ #
-# list_agents — session objects use "key" field
+# list_agents — uses agents.list gateway RPC
 # ------------------------------------------------------------------ #
 
 
-async def test_list_agents_calls_sessions_list() -> None:
+async def test_list_agents_calls_agents_list() -> None:
     mock, client = _make_client()
     mock.register(
-        "sessions.list",
+        "agents.list",
         {
-            "sessions": [
-                {"key": "agent:bot1:main", "status": "idle"},
-                {"key": "agent:bot2:main", "status": "running"},
-            ]
+            "defaultId": "main",
+            "agents": [
+                {"id": "bot1"},
+                {"id": "bot2"},
+            ],
         },
     )
 
     result = await client.list_agents()
 
-    mock.assert_called("sessions.list")
+    mock.assert_called("agents.list")
     assert len(result) == 2
     assert result[0].agent_id == "bot1"
     assert result[0].status == AgentStatus.IDLE
     assert result[1].agent_id == "bot2"
-    assert result[1].status == AgentStatus.RUNNING
 
 
 async def test_list_agents_handles_empty_list() -> None:
     mock, client = _make_client()
-    mock.register("sessions.list", {"sessions": []})
+    mock.register("agents.list", {"agents": []})
 
     result = await client.list_agents()
 
     assert result == []
 
 
-async def test_list_agents_unknown_status_defaults_to_idle() -> None:
-    mock, client = _make_client()
-    mock.register(
-        "sessions.list",
-        {"sessions": [{"key": "agent:x:main", "status": "unknown-state"}]},
-    )
-
-    result = await client.list_agents()
-
-    assert result[0].status == AgentStatus.IDLE
-
-
 # ------------------------------------------------------------------ #
-# delete_agent — uses {key} not {sessionKey}
+# delete_agent — uses agents.delete gateway RPC
 # ------------------------------------------------------------------ #
 
 
-async def test_delete_agent_calls_sessions_delete() -> None:
+async def test_delete_agent_calls_agents_delete() -> None:
     mock, client = _make_client()
-    mock.register("sessions.delete", {})
+    mock.register("agents.delete", {"ok": True})
 
     result = await client.delete_agent("old-bot")
 
     method, params = mock.calls[-1]
-    assert method == "sessions.delete"
-    assert params["key"] == "agent:old-bot:main"
+    assert method == "agents.delete"
+    assert params == {"agentId": "old-bot"}
     assert result is True
 
 

@@ -76,13 +76,14 @@ async def test_create_schedule(connected_mock_gateway: MockGateway) -> None:
     assert result.name == "daily"
     assert result.id == "job_1"
     # Verify the correct gateway params were used (camelCase on the wire).
+    # String schedule/payload are wrapped into gateway objects by create_schedule.
     connected_mock_gateway.assert_called_with(
         "cron.add",
         {
             "name": "daily",
-            "schedule": "0 9 * * *",
+            "schedule": {"kind": "cron", "expr": "0 9 * * *"},
             "sessionTarget": "agent:main:main",
-            "payload": "run daily report",
+            "payload": {"message": "run daily report"},
         },
     )
 
@@ -108,13 +109,14 @@ async def test_create_schedule_maps_session_target(connected_mock_gateway: MockG
     )
     await manager.create_schedule(config)
     # Confirm camelCase key was used, not snake_case.
+    # String schedule/payload are wrapped into gateway objects by create_schedule.
     connected_mock_gateway.assert_called_with(
         "cron.add",
         {
             "name": "weekly",
-            "schedule": "0 9 * * 1",
+            "schedule": {"kind": "cron", "expr": "0 9 * * 1"},
             "sessionTarget": "agent:researcher:main",
-            "payload": "weekly digest",
+            "payload": {"message": "weekly digest"},
         },
     )
 
@@ -125,9 +127,7 @@ async def test_create_schedule_maps_session_target(connected_mock_gateway: MockG
 
 
 async def test_cron_status(connected_mock_gateway: MockGateway) -> None:
-    connected_mock_gateway.register(
-        "cron.status", {"enabled": True, "storePath": "/tmp/cron"}
-    )
+    connected_mock_gateway.register("cron.status", {"enabled": True, "storePath": "/tmp/cron"})
     manager = ScheduleManager(connected_mock_gateway)
     result = await manager.cron_status()
     assert result["enabled"] is True
@@ -144,9 +144,7 @@ async def test_update_schedule(connected_mock_gateway: MockGateway) -> None:
     manager = ScheduleManager(connected_mock_gateway)
     result = await manager.update_schedule("job_1", {"enabled": False})
     assert result["ok"] is True
-    connected_mock_gateway.assert_called_with(
-        "cron.update", {"id": "job_1", "enabled": False}
-    )
+    connected_mock_gateway.assert_called_with("cron.update", {"id": "job_1", "enabled": False})
 
 
 # ---------------------------------------------------------------------------
@@ -216,9 +214,7 @@ async def test_wake_custom_args(connected_mock_gateway: MockGateway) -> None:
     connected_mock_gateway.register("wake", {"ok": True})
     manager = ScheduleManager(connected_mock_gateway)
     await manager.wake(mode="scheduled", text="hello agent")
-    connected_mock_gateway.assert_called_with(
-        "wake", {"mode": "scheduled", "text": "hello agent"}
-    )
+    connected_mock_gateway.assert_called_with("wake", {"mode": "scheduled", "text": "hello agent"})
 
 
 # ---------------------------------------------------------------------------

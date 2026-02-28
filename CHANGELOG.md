@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.0] — 2026-02-28
+
+### Added — Gateway Coverage Expansion (55 new facade methods)
+
+- **Agent CRUD & Files** — 7 new methods: `agents.create`, `agents.list`, `agents.delete`, `agents.update`, `agents.files.get`, `agents.files.set`, `agents.files.list`, plus `agent.identity.get`
+- **Exec Approvals** — 6 new methods: `exec.approval.request`, `exec.approval.waitDecision`, `exec.approval.resolve`, `exec.approvals.get`, `exec.approvals.set`, `exec.approvals.node.get/set`
+- **Usage & Analytics** — 3 new methods: `usage.status`, `usage.cost`, `sessions.usage`
+- **Device Pairing** — 4 new methods: `device.pair.list`, `device.pair.approve/reject/remove`, `device.token.rotate/revoke`
+- **Skills via Gateway** — 4 new methods: `skills.status`, `skills.bins`, `skills.install`, `skills.update`
+- **Models/Tools/System** — 4 new methods: `models.list`, `tools.catalog`, `system.status`, `doctor.memory.status`
+- **Node Expansion** — 8 new methods: `node.rename`, `node.invoke.result`, `node.event`, `node.pair.request/list/approve/reject/verify`
+- **TTS/Wizard/Voice/Misc** — 19 new methods: `tts.status/enable/disable/setProvider/providers`, `wizard.start/status/cancel`, `voicewake.get/set`, `system-event`, `last-heartbeat`, `set-heartbeats`, `secrets.reload`, `update.run`, and more
+- **Live Gateway Integration Tests** — 99 tests covering all 81 facade methods + manager wrappers against a real OpenClaw gateway
+
+### Added — New Managers
+
+- `TTSManager` — text-to-speech operations: `status()`, `enable()`, `disable()`, `set_provider()`, `providers()`
+- `DeviceManager` — device token management: `list_paired()`, `approve()`, `reject()`, `remove()`, `rotate_token()`, `revoke_token()`
+- `NodeManager` — expanded with `pair_list()`, `pair_request()`, `pair_approve/reject/verify()`, `rename()`
+- `OpsManager` — expanded with `usage_status()`, `usage_cost()`, `sessions_usage()`, `system_status()`, `memory_status()`, `system_event()`, `last_heartbeat()`, `set_heartbeats()`, `secrets_reload()`, `update_run()`
+
+### Fixed
+
+- **`ScheduleManager.create_schedule`** — gateway requires `schedule` as `{kind:"cron", expr:"..."}` object and `payload` as `{message:"..."}` object; SDK now auto-wraps string values
+- **`OpenClawClient.create_agent`** — gateway requires `workspace` parameter; now defaults to `"."` when not provided
+- **Ed25519 handshake** — added `cryptography` as dev dependency for device auth signing (required for live gateway connection)
+
+### Changed
+
+- Public API surface expanded from 225 to 263 symbols
+- Gateway facade methods expanded from ~30 to 81
+- Test suite expanded from 1299 to 1621 tests (1522 unit + 99 live integration)
+- OpenClaw compatibility updated to `max_tested: "2026.2.28"`
+
+### Stats
+
+- 1,621 tests, 161 source files `mypy` clean, `ruff` clean
+- 99 live gateway integration tests — all passing against OpenClaw 2026.2.28
+
+---
+
 ## [2.0.0] — 2026-02-22
 
 ### Added — v2.0 Features (15 new modules)
@@ -189,6 +230,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `approvals.*` and `usage.*` do not exist on the gateway
 - Skills and webhooks are CLI-only, not gateway RPC
 
-[Unreleased]: https://github.com/openclaw/openclaw-sdk/compare/v0.2.0...HEAD
-[0.2.0]: https://github.com/openclaw/openclaw-sdk/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/openclaw/openclaw-sdk/releases/tag/v0.1.0
+[Unreleased]: https://github.com/masteryodaa/openclaw-sdk/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/masteryodaa/openclaw-sdk/compare/v2.0.0...v2.1.0
+[2.0.0]: https://github.com/masteryodaa/openclaw-sdk/compare/v1.1.0...v2.0.0
+[1.1.0]: https://github.com/masteryodaa/openclaw-sdk/compare/v0.2.0...v1.1.0
+[0.2.0]: https://github.com/masteryodaa/openclaw-sdk/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/masteryodaa/openclaw-sdk/releases/tag/v0.1.0
