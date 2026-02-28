@@ -1,6 +1,6 @@
 # OpenClaw SDK — Project Status
 
-> Last updated: 2026-02-22
+> Last updated: 2026-02-28
 > Auto-updated by Claude Code after each work session.
 
 ---
@@ -137,7 +137,8 @@
 ### Quality
 - `py.typed` marker (PEP 561)
 - 1299 tests, 97%+ coverage
-- E2E verified against live OpenClaw 2026.2.3-1 gateway
+- E2E verified against live OpenClaw post-2026.2.26 (dev build) gateway
+- 93 gateway methods verified (up from ~30), 19 events discovered
 - mypy clean (159 files), ruff clean
 - MkDocs Material documentation site (55+ pages)
 - Command Center with 19 routers, 17 tabs, all API-tested against live gateway

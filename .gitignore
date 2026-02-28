@@ -1,15 +1,38 @@
+# ── Claude Code workspace ──────────────────────────────────────────
+# Ignore contents of .claude/ by default, then un-ignore team-shared files
+# MUST use .claude/* (not .claude/) so git looks inside and negation works
+.claude/*
+!.claude/CLAUDE.md
+!.claude/compaction-context.md
+!.claude/settings.json
+!.claude/rules/
+!.claude/rules/**
+!.claude/skills/
+!.claude/skills/**
+!.claude/hooks/
+!.claude/hooks/**
+!.claude/tasks/
+!.claude/tasks/**
+!.claude/context/
+!.claude/context/**
+
+# Personal Claude files (never committed)
+CLAUDE.local.md
+
+# ── Planning docs (reference only) ────────────────────────────────
 doc.md
 plan.md
-.claude
+old_plan.md
+plans/
 
-# Virtual environment
+# ── Virtual environment ───────────────────────────────────────────
 env/
 .venv/
 
-# Poetry
+# ── Poetry ────────────────────────────────────────────────────────
 poetry.lock
 
-# Python build artefacts
+# ── Python build artefacts ────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -17,7 +40,7 @@ dist/
 build/
 *.egg
 
-# Test / coverage artefacts
+# ── Test / coverage artefacts ─────────────────────────────────────
 .coverage
 .coverage.*
 htmlcov/
@@ -25,34 +48,15 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
-# MkDocs build output
+# ── MkDocs build output ──────────────────────────────────────────
 site/
 
-# Development screenshots
-docs-*.png
+# ── Development screenshots ──────────────────────────────────────
+*.png
 
-# Scratch / temp files
+# ── Scratch / temp files ─────────────────────────────────────────
 gen_tests.py
-old_plan.md
 test_attachment_types.py
 
-# Playwright MCP logs
+# ── Playwright MCP logs ──────────────────────────────────────────
 .playwright-mcp/
-
-# Screenshots (dev/testing/marketing — not project assets)
-*.png
-whatsapp-qr-login.png
-chat-*.png
-command-center-*.png
-
-# Generated marketing images
-openclaw-frog-pfp.png
-openclaw-pfp-uhd.png
-openclaw-x-pfp.png
-openclaw-x-cover.png
-x-post-*.png
-x-first-post.png
-langchain-ref.png
-
-# Internal development plans
-plans/

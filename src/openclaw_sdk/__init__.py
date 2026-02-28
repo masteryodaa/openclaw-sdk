@@ -6,8 +6,8 @@ from openclaw_sdk.__version__ import __version__
 # Declare the range of OpenClaw gateway versions this SDK release supports.
 # SDK startup may optionally warn when the connected OpenClaw is outside this range.
 __openclaw_compat__ = {
-    "min": "2026.2.0",              # Minimum supported OpenClaw version
-    "max_tested": "2026.2.3-1",     # Highest version tested against
+    "min": "2026.2.0",  # Minimum supported OpenClaw version
+    "max_tested": "2026.2.26",  # Highest version tested against
 }
 
 from openclaw_sdk.core.agent import Agent
@@ -89,7 +89,11 @@ from openclaw_sdk.skills.config import SkillEntry, SkillInstallConfig, SkillLoad
 from openclaw_sdk.skills.manager import SkillInfo, SkillManager
 from openclaw_sdk.approvals.manager import ApprovalManager
 from openclaw_sdk.cache.base import InMemoryCache, ResponseCache
-from openclaw_sdk.cache.embeddings import EmbeddingProvider, OpenAIEmbeddingProvider, SimpleEmbeddingProvider
+from openclaw_sdk.cache.embeddings import (
+    EmbeddingProvider,
+    OpenAIEmbeddingProvider,
+    SimpleEmbeddingProvider,
+)
 from openclaw_sdk.cache.semantic import SemanticCache
 from openclaw_sdk.config.manager import ConfigManager, KNOWN_PROVIDERS
 from openclaw_sdk.devices.manager import DeviceManager
@@ -153,8 +157,10 @@ from openclaw_sdk.multitenancy import Tenant, TenantConfig, TenantWorkspace
 from openclaw_sdk.resilience.circuit_breaker import CircuitBreaker
 from openclaw_sdk.resilience.rate_limiter import RateLimiter
 from openclaw_sdk.resilience.retry import RetryPolicy, retry_async
+
 # v2.0 — Plugins
 from openclaw_sdk.plugins import Plugin, PluginHook, PluginMetadata, PluginRegistry
+
 # v2.0 — Alerting
 from openclaw_sdk.alerting import (
     Alert,
@@ -171,6 +177,7 @@ from openclaw_sdk.alerting import (
     SlackAlertSink,
     WebhookAlertSink,
 )
+
 # v2.0 — Audit
 from openclaw_sdk.audit import (
     AuditEvent,
@@ -180,6 +187,7 @@ from openclaw_sdk.audit import (
     InMemoryAuditSink,
     StructlogAuditSink,
 )
+
 # v2.0 — Billing
 from openclaw_sdk.billing import (
     BillingManager,
@@ -189,6 +197,7 @@ from openclaw_sdk.billing import (
     PricingTier,
     UsageRecord,
 )
+
 # v2.0 — Data Sources
 from openclaw_sdk.data import (
     ColumnInfo,
@@ -199,6 +208,7 @@ from openclaw_sdk.data import (
     SupabaseDataSource,
     TableInfo,
 )
+
 # v2.0 — Connectors
 from openclaw_sdk.connectors import (
     Connector,
@@ -215,6 +225,7 @@ from openclaw_sdk.connectors import (
     StripeConnector,
     ZendeskConnector,
 )
+
 # v2.0 — Autonomous
 from openclaw_sdk.autonomous import (
     AgentCapability,
@@ -226,6 +237,7 @@ from openclaw_sdk.autonomous import (
     Watchdog,
     WatchdogAction,
 )
+
 # v2.0 — Voice
 from openclaw_sdk.voice import (
     DeepgramSTT,
@@ -237,6 +249,7 @@ from openclaw_sdk.voice import (
     VoiceResult,
     WhisperSTT,
 )
+
 # v2.0 — Workflows
 from openclaw_sdk.workflows import (
     StepStatus,
