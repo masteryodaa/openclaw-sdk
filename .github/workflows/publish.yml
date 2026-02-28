@@ -7,10 +7,9 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
-  test:
+  quality-gate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,24 +17,28 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
 
       - name: Install dependencies
         run: |
           pip install --upgrade pip
           pip install -e ".[fastapi]"
-          pip install pytest pytest-asyncio pytest-cov mypy ruff cryptography
+          pip install pytest pytest-asyncio pytest-cov mypy ruff black cryptography
 
       - name: Run tests
-        run: python -m pytest tests/ -q
+        run: python -m pytest tests/ -q --tb=short
 
-      - name: Type check
-        run: python -m mypy src/ --ignore-missing-imports
+      - name: Type check (strict)
+        run: python -m mypy --strict src/openclaw_sdk
 
-      - name: Lint
+      - name: Lint (ruff)
         run: python -m ruff check src/ tests/
 
+      - name: Format check (black)
+        run: python -m black --check src/ tests/
+
   publish:
-    needs: test
+    needs: quality-gate
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -46,12 +49,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
 
       - name: Install build tools
         run: pip install build twine
 
       - name: Build package
         run: python -m build
+
+      - name: Verify package
+        run: python -m twine check dist/*
 
       - name: Publish to PyPI
         env:
