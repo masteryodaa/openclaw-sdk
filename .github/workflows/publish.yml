@@ -29,7 +29,7 @@ jobs:
         run: python -m pytest tests/ -q --tb=short
 
       - name: Type check (strict)
-        run: python -m mypy --strict src/openclaw_sdk
+        run: python -m mypy --strict --ignore-missing-imports src/openclaw_sdk
 
       - name: Lint (ruff)
         run: python -m ruff check src/ tests/

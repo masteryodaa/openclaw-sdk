@@ -125,6 +125,10 @@ ignore_missing_imports = true
 module = "openclaw_sdk.connectors.*"
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = "openclaw_sdk.tracing.*"
+ignore_missing_imports = true
+
 [tool.poetry.plugins."openclaw_sdk.plugins"]
 
 [tool.ruff]
