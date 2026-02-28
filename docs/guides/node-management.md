@@ -164,6 +164,4 @@ asyncio.run(main())
 
 ## API Reference
 
-::: openclaw_sdk.nodes.manager.NodeManager
-    options:
-      show_source: false
+See the full [NodeManager API reference](../api/managers.md#openclaw_sdk.nodes.manager.NodeManager).
